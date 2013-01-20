@@ -278,8 +278,7 @@ class Package:
     #             if level < maxlevel:
     #                 result = (result and
     #                           p.filterNbDeps(minsearch, maxsearch,  maxlevel, level + 1))
-
-        return result
+    #    return result
 
     def addDeps(self, obj):
         if obj not in self.__deps:
@@ -587,8 +586,8 @@ def getPkgListNew(filter=""):
     return packages
 
 
-def loadPkgInfo():
-    if os.path.exists('/tmp/packages'):
+def loadPkgInfo(forceupdate):
+    if forceupdate == False and os.path.exists('/tmp/packages'):
         packages = pickle.load(open('/tmp/packages', 'rb'))
     else:
         # Parse all installed packages
@@ -627,6 +626,7 @@ def usage():
     print "  -t <pkgname>, --tree <pkgname>     show tree dependencies"
     print "  -n <Num>, --num <Num>              number lines displayed"
     print "  -g <filename>, --graph <filename>  write a graphviz file"
+    print "  -u, --updatep                      force update load pkgfile"
     print "  -h, --help                         shows this help screen"
 
 
@@ -634,8 +634,8 @@ def main():
     try:
         opts, args = getopt.getopt(
             sys.argv[1:],
-            "ht:n:f:",
-            ["help", "tree=", "nblines=", "filterby="])
+            "hut:n:f:",
+            ["help", "update", "tree=", "nblines=", "filterby="])
     except getopt.GetoptError:
         usage()
         sys.exit(2)
@@ -644,6 +644,7 @@ def main():
     filterby = ""
     action = ""
     pkgname = ""
+    forceupdate = False
     for opt, arg in opts:
         if opt in ("-n", "--nblines"):
             try:
@@ -655,6 +656,10 @@ def main():
         if opt in ("-f", "--filter"):
             filterby = arg
 
+        if opt in ("-u", "--update"):
+            forceupdate = True
+
+
         if opt in ("-t", "--tree"):
             action = "tree"
             pkgname = arg
@@ -663,7 +668,7 @@ def main():
             usage()
             sys.exit()
 
-    packages = loadPkgInfo()
+    packages = loadPkgInfo(forceupdate)
 
     if action == "tree":
         showDeps(packages, pkgname)
