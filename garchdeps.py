@@ -1,5 +1,8 @@
 #!/usr/bin/python2
 
+# Sample commands
+# ./garchdeps.py -n1 -s tdeps -g /tmp/graph.dot  ; tred /tmp/graph.dot | dot  -Tpng -o /tmp/graph.png
+
 # Import files
 import os
 import re
@@ -179,6 +182,7 @@ class Package:
     def __repr__(self):
         return self.pkgname
 
+
     def showDeps(self, level=0, pkglist=None):
         s = ""
 
@@ -337,7 +341,8 @@ class Packages:
 
         s = "digraph G0 {\n"
         s += "ranksep=3;\n"
-        s += "rankdir=LR;\n"
+        # s += "rankdir=LR;\n"
+        s += "rankdir=AUTO;\n"
         s += "node [shapre = box, colorscheme=paired12,\
  fontname=Deja, style=filled, fillcolor=\"#def5ff\", fontsize=40];\n"
 
@@ -439,7 +444,7 @@ class Packages:
         print'%-40s | %-7s | %-8s | %-8s | %-8s | %-9s | %10s |' % \
             ("Package",
              "T. Deps",
-             "M. depth",
+             "N. depth",
              "N usedby",
              " Size",
              "T. Size",
@@ -462,6 +467,17 @@ class Packages:
         for p in self.mylist:
             p.maxdepth = p.searchMaxDepth(0, 0)
 
+    def sortBy(self, sortby):
+        if sortby != "":
+            if sortby == "nusedby":
+                self.sortByNbUsed()
+            if sortby == "tsize":
+                self.sortByTotalSize()
+            if sortby == "size":
+                self.sortBySize()
+            if sortby == "tdeps":
+                self.sortByTotalDeps()
+
     def sortByMaxDepth(self):
         self.mylist.sort(key=lambda p: p.maxdepth, reverse=True)
 
@@ -469,7 +485,7 @@ class Packages:
         self.mylist.sort(key=lambda p: p.nbused, reverse=True)
 
     def sortByTotalDeps(self):
-        self.mylist.sort(key=lambda p: p.totaldeps, reverse=True)
+        self.mylist.sort(key=lambda p: p.nbtotaldeps, reverse=True)
 
     def sortBySize(self):
         self.mylist.sort(key=lambda p: p.size, reverse=True)
@@ -610,22 +626,13 @@ def showDeps(packages, pkgname):
         print(p.showDeps())
 
 
-def showList(packages, n):
-    global installed
-    global depends
-    global ignores
-
-    packages.filterManualInstall()
-    packages.sortBySize()
-    packages[:n].showColumn()
-
-
 def usage():
     print "Usage: %s [OPTIONS]" % (sys.argv[0])
     print "A package dependencies graph tools"
-    print "  -t <pkgname>, --tree <pkgname>     show tree dependencies"
-    print "  -n <Num>, --num <Num>              number lines displayed"
-    print "  -g <filename>, --graph <filename>  write a graphviz file"
+    print "  -t, --tree <pkgname>     show tree dependencies"
+    print "  -n, --num <Num>          number lines displayed"
+    print "  -g, --graph <filename>   write a graphviz file"
+    print "  -s, --sortby <nusedby, tsize, tdeps> sort list by"
     print "  -u, --updatep                      force update load pkgfile"
     print "  -h, --help                         shows this help screen"
 
@@ -634,8 +641,9 @@ def main():
     try:
         opts, args = getopt.getopt(
             sys.argv[1:],
-            "hut:n:f:",
-            ["help", "update", "tree=", "nblines=", "filterby="])
+            "hug:t:n:f:s:",
+            ["help", "update", "graph=", "tree=",
+             "nblines=", "filterby=", "sortby="])
     except getopt.GetoptError:
         usage()
         sys.exit(2)
@@ -644,6 +652,8 @@ def main():
     filterby = ""
     action = ""
     pkgname = ""
+    filename = ""
+    sortby = ""
     forceupdate = False
     for opt, arg in opts:
         if opt in ("-n", "--nblines"):
@@ -654,15 +664,23 @@ def main():
                 sys.exit(2)
 
         if opt in ("-f", "--filter"):
+            action = "filter"
             filterby = arg
 
         if opt in ("-u", "--update"):
+            action = "update"
             forceupdate = True
 
+        if opt in ("-g", "--graph"):
+            action = "graph"
+            filename = arg
 
         if opt in ("-t", "--tree"):
             action = "tree"
             pkgname = arg
+
+        if opt in ("-s", "--sortby"):
+            sortby = arg
 
         if opt in ("-h", "--help"):
             usage()
@@ -672,11 +690,19 @@ def main():
 
     if action == "tree":
         showDeps(packages, pkgname)
-    else:
-        if action == "filter":
-            filterby = "none"
-        else:
-            showList(packages, n)
+
+    if action == "filter":
+        filterby = "none"
+
+    if sortby != "":
+        packages.sortBy(sortby)
+
+    if action == "graph":
+        generateGraph(packages[:n], filename)
+
+    if action == "":
+        packages[:n].showColumn()
+
 
 if __name__ == "__main__":
     main()
