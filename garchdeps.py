@@ -607,6 +607,7 @@ def loadPkgInfo(forceupdate):
         packages = pickle.load(open('/tmp/packages', 'rb'))
     else:
         # Parse all installed packages
+        print ("Caching the package list, please wait ...")
         packages = getPkgListNew()
         packages.analyseAllPkg()
         packages.searchMaxDepth()
