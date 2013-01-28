@@ -1,7 +1,8 @@
 #!/usr/bin/python2
+# -*- coding: utf-8 -*-
 
 # Sample commands
-# ./garchdeps.py -n1 -s tdeps -g /tmp/graph.dot  ; tred /tmp/graph.dot | dot  -Tpng -o /tmp/graph.png
+# ./garchdeps.py -f qt -g /tmp/graph.dot  ; tred /tmp/graph.dot | dot -Tpng  -o /tmp/graph.png
 
 # Import files
 import os
@@ -182,6 +183,239 @@ class Package:
     def __repr__(self):
         return self.pkgname
 
+    def convertSize(self, s):
+        if s > (1000 * 1000):
+            r = "%s %s" % (int(s / 1024 / 1024), "GB")
+        else:
+            if s > 1000:
+                r = "%s %s" % (int(s / 1024), "MB")
+            else:
+                r = "%s KB" % s
+
+        return r
+
+    # Package
+    def calcGraphviz(self,
+                        packages,
+                        blocklist,
+                        endlevel=99,
+                        level=0,
+                        idxcolor=1,
+                        duplicate=None):
+
+        if not duplicate:
+            duplicate = []
+
+        s = ""
+
+        size = len(packages)
+
+        mini = packages[20].nbused
+        mini1 = packages[40].nbused
+
+        # If a virtual package, get a provided package
+        p = self.realpkg
+
+        # Check if allready exist
+        exists = True
+        if p not in duplicate:
+            exists = False
+            duplicate.append(p)
+
+        subgraph = False
+        if p in blocklist:
+            subgraph = True
+            s += 'subgraph cluster_%s { style="rounded,filled"; colorscheme=pastel28;\
+ fillcolor=%s; color="#00000000"; fontsize=128;\
+label = "%s (%s - %s)";\n' %\
+                (getCounter('cluster'),
+                 (getCounter('idxcolor') % 8) + 1,
+                 p.pkgname,
+                 self.convertSize(p.size),
+                 self.convertSize(p.totalsize)
+                 )
+
+        fillcolor = ""
+        if level == 0:
+            fillcolor = ', fillcolor="red2", color="red2"'
+
+        if not exists:
+            nbused = p.nbused
+
+            if nbused > mini1:
+                opts = 'fontsize=30'
+                if fillcolor == "":
+                    opts += ', fillcolor="deepskyblue", color="deepskyblue"'
+
+                if nbused > mini:
+                    opts = 'fontsize=45'
+                    if fillcolor == "":
+                        opts += ', fillcolor="deeppink", color="deeppink"'
+
+            else:
+                opts = 'fontsize=10'
+
+            if fillcolor != "":
+                opts += fillcolor
+
+            if self.virtual:
+                s += '"%s" [label="%s(by %s)\\n%s\\n%s" %s];\n' %\
+                    (self.pkgname,
+                     self.pkgname,
+                     p.pkgname,
+                     self.convertSize(p.size),
+                     self.convertSize(p.totalsize),
+                     opts
+                     )
+            else:
+                s += '"%s" [label="%s\\n%s\\n%s" %s];\n' %\
+                    (p.pkgname,
+                     self.pkgname,
+                     self.convertSize(p.size),
+                     self.convertSize(p.totalsize),
+                     opts
+                     )
+
+        level += 1
+        for o in p.deps:
+            d = o.realpkg
+
+            exists = True
+            if d not in duplicate:
+                exists = False
+
+            if not exists:
+                nbused = d.nbused
+                if nbused > mini1:
+                    opts = 'fontsize=30, fillcolor="deepskyblue", color="deepskyblue"'
+                    if nbused > mini:
+                        opts = 'fontsize=45, fillcolor="deeppink", color="deeppink"'
+                else:
+                    opts = 'fontsize=10'
+
+                if o.virtual:
+                    s += '"%s" [label="%s(by %s)\\n%s\\n%s" %s];\n' %\
+                        (d.pkgname, o.pkgname, d.pkgname, self.convertSize(d.size), self.convertSize(d.totalsize), opts)
+                else:
+                    s += '"%s" [label="%s\\n%s\\n%s" %s];\n' % (o.pkgname, o.pkgname, self.convertSize(d.size), self.convertSize(d.totalsize), opts)
+
+            s += '"%s" -> "%s";\n' % (p.pkgname, d.pkgname)
+
+            if not exists:
+                duplicate.append(d)
+                s += d.calcGraphviz(packages,
+                                       blocklist,
+                                       endlevel,
+                                       level,
+                                       idxcolor,
+                                       duplicate)
+
+        if subgraph:
+            s += "}/* bruno */\n"
+
+        return s
+
+    def showGraphviz(self, blocklist=None,
+                     endlevel=99, level=0, idxcolor=1, duplicate=None):
+
+        if not blocklist:
+            blocklist = []
+
+        if not duplicate:
+            duplicate = []
+
+        s = ""
+
+        # If a virtual package, get a provided package
+        p = self.realpkg
+
+        # Check if allready exist
+        exists = True
+        if p not in duplicate:
+            exists = False
+            p.idxcolor = idxcolor
+            duplicate.append(p)
+
+        subgraph = False
+        if p in blocklist:
+            subgraph = True
+            s += "subgraph cluster_%s { colorscheme=set312;style=filled;\
+fillcolor=%s;fontsize=128;label = \"%s\";\n" %\
+                (getCounter('cluster'),
+                 (getCounter('idxcolor') % 12) + 1,
+                 p.pkgname)
+
+        # Check if manual installation for calc color
+        ccolor = (p.idxcolor % 8) + 2
+        if p.manualinstalled:
+            if len(p.deps) == 0:
+                ccolor = 1
+            else:
+                found = False
+                for t in p.deps:
+                    if t.idxcolor != -1:
+                        found = True
+                if found:
+                    ccolor = 1
+
+        if not exists:
+            opts = ""
+            if p.manualinstalled:
+                opts = "shape=house"
+
+            if self.virtual:
+                opts = "shape=diamond"
+
+            if self.virtual:
+                s += '"%s"[label="L:%s %s(by %s){%s}\n%s\n%s" %s  fillcolor=%s];\n' %\
+                    (self.pkgname,
+                     level,
+                     self.pkgname,
+                     p.pkgname,
+                     p.idxcolor,
+                     p.convertSize(p.size),
+                     p.convertSize(p.totalsize),
+                     opts,
+                     ccolor)
+            else:
+                s += '"%s"[label="L:%s %s/{%s}\n%s\n%s" %s fillcolor=%s];\n' %\
+                    (p.pkgname,
+                     level,
+                     self.pkgname,
+                     p.idxcolor,
+                     p.convertSize(p.size),
+                     p.convertSize(p.totalsize),
+                     opts,
+                     ccolor)
+
+        level += 1
+        for o in p.deps:
+            d = o.realpkg
+            if d.idxcolor == -1:
+                d.idxcolor = idxcolor
+
+            exists = True
+            if d not in duplicate:
+                exists = False
+
+            ccolor = (p.idxcolor % 8) + 2
+            if not exists:
+                if o.virtual:
+                    s += '"%s" [label="%s(by %s)/{%s}\n%s\n%s" shape=diamond fillcolor=%s];\n' %\
+                        (d.pkgname, o.pkgname, d.pkgname, d.idxcolor, d.convertSize(d.size), d.convertSize(d.totalsize), ccolor)
+                else:
+                    s += '"%s" [label="%s/{%s}\n%s\n%s" fillcolor=%s];\n' % (o.pkgname, o.pkgname, idxcolor, d.convertSize(d.size), d.convertSize(d.totalsize), ccolor)
+
+            s += '"%s" -> "%s";\n' % (p.pkgname, d.pkgname)
+
+            if not exists:
+                duplicate.append(d)
+                s += d.showGraphviz(blocklist,endlevel, level, idxcolor, duplicate)
+
+        if subgraph:
+            s += "}/* bruno */\n"
+
+        return s
 
     def showDeps(self, level=0, pkglist=None):
         s = ""
@@ -196,15 +430,18 @@ class Package:
 
         if level == 0:
             if self.virtual:
-                s = "%s+--%s(by %s)\n" % (level * " ", self.pkgname, p.pkgname)
+                s = "%s──%s(by %s)\n" % (level * " ", self.pkgname, p.pkgname)
             else:
-                s = "%s|--%s \n" % (level * " ", p.pkgname)
+                s = "%s──%s \n" % (level * " ", p.pkgname)
 
         if p.pkgname not in pkglist:
             pkglist.append(p.pkgname)
 
         level += 1
+        nbdeps = len(p.deps)
+        cdeps = 0
         for o in p.deps:
+            cdeps += 1
             if o.virtual:
                 p = o.providedby
             else:
@@ -212,15 +449,15 @@ class Package:
 
             # Calc a separator
             space = level * "   "
-            if len(p.deps) > 0:
-                line = '|'
+            if cdeps == nbdeps:
+                line = '└'
             else:
-                line = '+'
+                line = '├'
 
             if o.virtual:
-                s += "%s%s--%s(by %s) \n" % (space, line, o.pkgname, p.pkgname)
+                s += "%s%s─%s(by %s) \n" % (space, line, o.pkgname, p.pkgname)
             else:
-                s += "%s%s--%s \n" % (space, line, p.pkgname)
+                s += "%s%s─%s \n" % (space, line, p.pkgname)
 
             if p.pkgname not in pkglist:
                 pkglist.append(p.pkgname)
@@ -270,20 +507,6 @@ class Package:
 
         self.totalsize = totalsize
 
-    # def filterNbDeps(self, minsearch, maxsearch=9999, maxlevel=99, level=0):
-    #     result = True
-
-    #     p = self.realpkg
-    #     result =  len(p.__deps) >= minsearch and len(p.__deps) <= nbdeps
-    #     if result:
-    #         for d in p.deps:
-    #             p = d.realpkg
-    #             result = result and ( len(p.__deps) >= minsearch and len(p.__deps) <= nbdeps)
-    #             if level < maxlevel:
-    #                 result = (result and
-    #                           p.filterNbDeps(minsearch, maxsearch,  maxlevel, level + 1))
-    #    return result
-
     def addDeps(self, obj):
         if obj not in self.__deps:
             self.__deps.append(obj)
@@ -304,8 +527,19 @@ class Package:
 
 
 class Packages:
+
+    @property
+    def mini(self):
+        return self.__mini
+
+    @property
+    def maxi(self):
+        return self.__maxi
+
     def __init__(self, initvalue=()):
         self.mylist = []
+        self.__mini = {}
+        self.__maxi = {}
         for x in initvalue:
             self.append(x)
 
@@ -314,7 +548,9 @@ class Packages:
 
     def __getitem__(self, index):
         if isinstance(index, slice):
-            return Packages(self.mylist[index.start:index.stop])
+            tp = Packages(self.mylist[index.start:index.stop])
+            tp.maxi = self.maxi
+            return tp
         else:
             return self.mylist[index]
 
@@ -324,6 +560,23 @@ class Packages:
 
     def __repr__(self):
         return self.mylist.__repr__()
+
+    def __compareField(self, field, obj):
+        # Mini
+        if not obj.virtual:
+            if field not in self.__mini:
+                self.__mini[field] = obj
+            else:
+                if getattr(obj, field) <= getattr(self.__mini[field], field):
+                    self.__mini[field] = obj
+
+        # Maxi
+        if not obj.virtual:
+            if field not in self.__maxi:
+                self.__maxi[field] = obj
+            else:
+                if getattr(obj, field) >= getattr(self.__maxi[field], field):
+                    self.__maxi[field] = obj
 
     def getPkgByName(self, pkgname):
         for o in self.mylist:
@@ -339,12 +592,12 @@ class Packages:
 
     def beforeGraph(self):
 
-        s = "digraph G0 {\n"
-        s += "ranksep=3;\n"
-        # s += "rankdir=LR;\n"
-        s += "rankdir=AUTO;\n"
-        s += "node [shapre = box, colorscheme=paired12,\
- fontname=Deja, style=filled, fillcolor=\"#def5ff\", fontsize=40];\n"
+        s = 'digraph G0 {\n'
+        s += "forcelabels=true;\n"
+        s += "rankdir=TB;\n"
+        s += 'node [shape=egg, fontname=Deja, style="filled",\
+ truecolor=true, fontsize=10, \
+ fillcolor="gray70", color="gray70", fontcolor="white"];\n'
 
         return s
 
@@ -352,6 +605,28 @@ class Packages:
         s = ("}")
 
         return s
+
+    # Packages
+    def calcGraphviz(self, tograph=None, blocklist=None, endlevel=99):
+        if not tograph:
+            tograph = []
+
+        if not blocklist:
+            blocklist = []
+
+        r = ""
+        idxcolor = 0
+        duplicate = [None]
+        for o in tograph:
+            idxcolor += 1
+            r += o.calcGraphviz(self,
+                                   blocklist,
+                                   endlevel,
+                                   0,
+                                   idxcolor,
+                                   duplicate)
+
+        return r
 
     def showGraphviz(self, pkglist=None, blocklist=None, endlevel=99):
         if not pkglist:
@@ -405,7 +680,7 @@ class Packages:
 
         return result
 
-    def analyseAllPkg(self):
+    def analyseDependencies(self):
 
         # Calc provide package
         for p in self.mylist:
@@ -428,10 +703,46 @@ class Packages:
                 else:
                     print ("Paquet de dependance non trouve %s" % d)
 
-        # Divers calc
+        # Calc depth
+        self.searchMaxDepth()
+
+    def calcStats(self):
         for p in self.mylist:
+            # Calc dependencies
             p.calcAllDeps()
             p.calcNbTotalSize()
+
+            # Calc mini/maxi
+            self.__compareField('size', p)
+            self.__compareField('totalsize', p)
+            self.__compareField('nbused', p)
+            self.__compareField('nbtotaldeps', p)
+            self.__compareField('maxdepth', p)
+
+    def showItem(self, title, field):
+        if field in ('size', 'totalsize'):
+            minvalue = self.__mini[field].convertSize(
+                getattr(self.__mini[field], field))
+            maxvalue = self.__maxi[field].convertSize(
+                getattr(self.__maxi[field], field))
+        else:
+            minvalue = getattr(self.__mini[field], field)
+            maxvalue = getattr(self.__maxi[field], field)
+
+        print ("   %-20s (min/max) : %-30s     %s(%s)" %
+               (title,
+                "%s(%s)" % (self.__mini[field].pkgname, minvalue),
+                self.__maxi[field].pkgname,
+                maxvalue
+                ))
+
+    def showInfo(self):
+        print ("Packages installed: %s" % len(self.mylist))
+        self.showItem("Size", 'size')
+        self.showItem("Total Size", 'totalsize')
+        self.showItem('Used by', 'nbused')
+        self.showItem('Total deps', 'nbtotaldeps')
+        self.showItem('Max depths', 'maxdepth')
 
     def showColumn(self):
         maxtsize = 0
@@ -441,27 +752,27 @@ class Packages:
         print ('-----------------------------------------+---------+\
 ----------+----------+----------+-----------+------------+' )
 
-        print'%-40s | %-7s | %-8s | %-8s | %-8s | %-9s | %10s |' % \
-            ("Package",
-             "T. Deps",
-             "N. depth",
-             "N usedby",
-             " Size",
-             "T. Size",
-             "% T. Size")
+        print ('%-40s | %-7s | %-8s | %-8s | %-8s | %-9s | %10s |' %
+               ("Package",
+                "T. Deps",
+                "N. depth",
+                "N usedby",
+                " Size",
+                "T. Size",
+                "% T. Size"))
 
         print ('-----------------------------------------+---------+\
 ----------+----------+----------+-----------+------------+' )
 
         for p in self.mylist:
-            print'%-40s | %7d | %8d | %8d | %8s | %9s | %-10s |' % \
-                (p.pkgname,
-                 p.nbtotaldeps,
-                 p.maxdepth,
-                 p.nbused,
-                 convertSize(p.size),
-                 convertSize(p.totalsize),
-                 "#" * int((p.totalsize / float(maxtsize)) * 10))
+            print ('%-40s | %7d | %8d | %8d | %8s | %9s | %-10s |' %
+                   (p.pkgname,
+                    p.nbtotaldeps,
+                    p.maxdepth,
+                    p.nbused,
+                    p.convertSize(p.size),
+                    p.convertSize(p.totalsize),
+                    "#" * int((p.totalsize / float(maxtsize)) * 10)))
 
     def searchMaxDepth(self):
         for p in self.mylist:
@@ -469,6 +780,8 @@ class Packages:
 
     def sortBy(self, sortby):
         if sortby != "":
+            if sortby == "name":
+                self.sortByName()
             if sortby == "nusedby":
                 self.sortByNbUsed()
             if sortby == "tsize":
@@ -477,6 +790,9 @@ class Packages:
                 self.sortBySize()
             if sortby == "tdeps":
                 self.sortByTotalDeps()
+
+    def sortByName(self):
+        self.mylist.sort(key=lambda p: p.pkgname, reverse=False)
 
     def sortByMaxDepth(self):
         self.mylist.sort(key=lambda p: p.maxdepth, reverse=True)
@@ -494,15 +810,6 @@ class Packages:
         self.mylist.sort(key=lambda p: p.totalsize, reverse=True)
 
 
-def convertSize(s):
-    if s > (1000 * 1000):
-        r = "%s %s" % (int(s / 1024 / 1024), "GB")
-    else:
-        if s > 1000:
-            r = "%s %s" % (int(s / 1024), "MB")
-        else:
-            r = "%s KB" % s
-    return r
 
 
 def cmp_pkgused(p1, p2):
@@ -526,7 +833,6 @@ def getPkgListNew(filter=""):
     current_pkg = None
     begin_tag_count = 0
     end_tag_count = 1
-    #output = sysexec("LC_ALL=C pacman %s -Qi  2>>/dev/null | tail -n %s" % (spkg,slimit))
 
     output = sysexec("LC_ALL=C pacman -Qi %s 2>>/dev/null" % (filter))
     lines = output.split('\n')
@@ -582,7 +888,6 @@ def getPkgListNew(filter=""):
                     # Leve le numero de version
                     if m:
                         pkgname = m.group(1)
-                        #packages[pkgname]['require'].append(p) 
                         if pkgname not in current_pkg.raw_deps:
                             current_pkg.raw_deps.append(pkgname)
 
@@ -603,14 +908,14 @@ def getPkgListNew(filter=""):
 
 
 def loadPkgInfo(forceupdate):
-    if forceupdate == False and os.path.exists('/tmp/packages'):
+    if not forceupdate and os.path.exists('/tmp/packages'):
         packages = pickle.load(open('/tmp/packages', 'rb'))
     else:
         # Parse all installed packages
         print ("Caching the package list, please wait ...")
         packages = getPkgListNew()
-        packages.analyseAllPkg()
-        packages.searchMaxDepth()
+        packages.analyseDependencies()
+        packages.calcStats()
 
         # Serialize the packages object
         oldlimit = sys.getrecursionlimit()
@@ -621,41 +926,75 @@ def loadPkgInfo(forceupdate):
     return packages
 
 
-def showDeps(packages, pkgname):
-    p = packages.getPkgByName(pkgname)
+def generateGraph(packages, findpkg, filename):
+    subgraph = []
+    subgraph.append(packages.getPkgByName('kdebase-runtime'))
+    subgraph.append(packages.getPkgByName('kdebase-workspace'))
+    subgraph.append(packages.getPkgByName('qt'))
+    subgraph.append(packages.getPkgByName('gtk3'))
+    subgraph.append(packages.getPkgByName('wxgtk'))
+
+    if not findpkg:
+        findpkg = packages.filterManualInstall()[:100]
+        findpkg.sortBy('tsize')
+
+    r = packages.beforeGraph()
+    r += packages.calcGraphviz(findpkg, subgraph, 99)
+    r += packages.afterGraph()
+
+    f = open(filename, 'wb')
+    f.write(r)
+    f.close()
+
+
+def searchPackage(packages, pkgnames):
+    findpkg = []
+    pkglist = pkgnames.split(",")
+    for p in pkglist:
+        f = packages.getPkgByName(p)
+        if f:
+            findpkg.append(f)
+
+    return findpkg
+
+
+def showDeps(p):
     if p:
         print(p.showDeps())
 
 
 def usage():
-    print "Usage: %s [OPTIONS]" % (sys.argv[0])
-    print "A package dependencies graph tools"
-    print "  -t, --tree <pkgname>     show tree dependencies"
-    print "  -n, --num <Num>          number lines displayed"
-    print "  -g, --graph <filename>   write a graphviz file"
-    print "  -s, --sortby <nusedby, tsize, tdeps> sort list by"
-    print "  -u, --updatep                      force update load pkgfile"
-    print "  -h, --help                         shows this help screen"
+    print ("Usage: %s [OPTIONS]" % (sys.argv[0]))
+    print ("A package dependencies graph tools")
+    print ("  -f, --find <pkgname>                 find package")
+    print ("  -t, --tree                           show tree dependencies")
+    print ("  -n, --num <Num>                      number lines displayed")
+    print ("  -g, --graph <filename>               write a graphviz file")
+    print ("  -s, --sortby <nusedby, tsize, tdeps> sort list by")
+    print ("  -u, --updatep                        force update load pkgfile")
+    print ("  -h, --help                           shows this help screen")
 
 
 def main():
     try:
         opts, args = getopt.getopt(
             sys.argv[1:],
-            "hug:t:n:f:s:",
-            ["help", "update", "graph=", "tree=",
-             "nblines=", "filterby=", "sortby="])
+            "hiug:tn:f:s:",
+            ["help", "info", "update", "graph=", "tree",
+             "nblines=", "find=", "sortby="])
     except getopt.GetoptError:
         usage()
         sys.exit(2)
 
     n = 20  # number line showed
-    filterby = ""
+    actionfind = False
+    actionforceupdate = False
+    findpkg = None
     action = ""
-    pkgname = ""
+    pkgnames = ""
     filename = ""
-    sortby = ""
-    forceupdate = False
+    sortby = "nusedby"
+
     for opt, arg in opts:
         if opt in ("-n", "--nblines"):
             try:
@@ -664,13 +1003,12 @@ def main():
                 usage()
                 sys.exit(2)
 
-        if opt in ("-f", "--filter"):
-            action = "filter"
-            filterby = arg
+        if opt in ("-f", "--find"):
+            actionfind = True
+            pkgnames = arg
 
         if opt in ("-u", "--update"):
-            action = "update"
-            forceupdate = True
+            actionforceupdate = True
 
         if opt in ("-g", "--graph"):
             action = "graph"
@@ -678,31 +1016,39 @@ def main():
 
         if opt in ("-t", "--tree"):
             action = "tree"
-            pkgname = arg
 
         if opt in ("-s", "--sortby"):
             sortby = arg
+
+        if opt in ("-i", "--info"):
+            action = "info"
 
         if opt in ("-h", "--help"):
             usage()
             sys.exit()
 
-    packages = loadPkgInfo(forceupdate)
+    allpackages = loadPkgInfo(actionforceupdate)
+
+    if actionfind:
+        findpkg = searchPackage(allpackages, pkgnames)
 
     if action == "tree":
-        showDeps(packages, pkgname)
-
-    if action == "filter":
-        filterby = "none"
+        if findpkg:
+            showDeps(findpkg[0])
+        else:
+            print ("Package not found")
 
     if sortby != "":
-        packages.sortBy(sortby)
+        allpackages.sortBy(sortby)
 
     if action == "graph":
-        generateGraph(packages[:n], filename)
+        generateGraph(allpackages, findpkg, filename)
+
+    if action == "info":
+        allpackages.showInfo()
 
     if action == "":
-        packages[:n].showColumn()
+        allpackages[:n].showColumn()
 
 
 if __name__ == "__main__":
