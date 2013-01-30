@@ -29,6 +29,20 @@ def getCounter(name, inc=1):
     return counters[name]
 
 
+def convertSize(s):
+    """ Convert size to human readable"""
+    if s > (1000 * 1000):
+        r = "%s %s" % (int(s / 1024 / 1024), "GB")
+    else:
+        if s > 1000:
+            r = "%s %s" % (int(s / 1024), "MB")
+        else:
+            r = "%s KB" % s
+
+    return r
+
+
+
 class Package:
     """ Object Package
     This object store the package informations
@@ -185,17 +199,6 @@ class Package:
     def __repr__(self):
         return self.pkgname
 
-    def convertSize(self, s):
-        """ Convert size to human readable"""
-        if s > (1000 * 1000):
-            r = "%s %s" % (int(s / 1024 / 1024), "GB")
-        else:
-            if s > 1000:
-                r = "%s %s" % (int(s / 1024), "MB")
-            else:
-                r = "%s KB" % s
-
-        return r
 
     def calcGraphviz(self,
                         packages,
@@ -231,8 +234,8 @@ label = "%s (%s - %s)";\n' %\
                 (getCounter('cluster'),
                  (getCounter('idxcolor') % 8) + 1,
                  p.pkgname,
-                 self.convertSize(p.size),
-                 self.convertSize(p.totalsize)
+                 convertSize(p.size),
+                 convertSize(p.totalsize)
                  )
 
         fillcolor = ""
@@ -263,16 +266,16 @@ label = "%s (%s - %s)";\n' %\
                     (self.pkgname,
                      self.pkgname,
                      p.pkgname,
-                     self.convertSize(p.size),
-                     self.convertSize(p.totalsize),
+                     convertSize(p.size),
+                     convertSize(p.totalsize),
                      opts
                      )
             else:
                 s += '"%s" [label="%s\\n%s\\n%s" %s];\n' %\
                     (p.pkgname,
                      self.pkgname,
-                     self.convertSize(p.size),
-                     self.convertSize(p.totalsize),
+                     convertSize(p.size),
+                     convertSize(p.totalsize),
                      opts
                      )
 
@@ -295,9 +298,9 @@ label = "%s (%s - %s)";\n' %\
 
                 if o.virtual:
                     s += '"%s" [label="%s(by %s)\\n%s\\n%s" %s];\n' %\
-                        (d.pkgname, o.pkgname, d.pkgname, self.convertSize(d.size), self.convertSize(d.totalsize), opts)
+                        (d.pkgname, o.pkgname, d.pkgname, convertSize(d.size), convertSize(d.totalsize), opts)
                 else:
-                    s += '"%s" [label="%s\\n%s\\n%s" %s];\n' % (o.pkgname, o.pkgname, self.convertSize(d.size), self.convertSize(d.totalsize), opts)
+                    s += '"%s" [label="%s\\n%s\\n%s" %s];\n' % (o.pkgname, o.pkgname, convertSize(d.size), convertSize(d.totalsize), opts)
 
             s += '"%s" -> "%s";\n' % (p.pkgname, d.pkgname)
 
@@ -428,10 +431,15 @@ class Packages:
     def maxi(self):
         return self.__maxi
 
+    @property
+    def allsize(self):
+        return self.__allsize
+
     def __init__(self, initvalue=()):
         self.mylist = []
         self.__mini = {}
         self.__maxi = {}
+        self.__allsize = 0
         for x in initvalue:
             self.append(x)
 
@@ -586,6 +594,14 @@ class Packages:
         # Calc depth
         self.searchMaxDepth()
 
+    def calcFullSize(self):
+        """ Get size of all installed packages"""
+        size = 0
+        for p in self.mylist:
+            size += p.size
+
+        self.__allsize = size
+
     def calcStats(self):
         """Calc and Seach Min/Max"""
         for p in self.mylist:
@@ -605,12 +621,13 @@ class Packages:
         for p in self.mylist:
             p.maxdepth = p.searchMaxDepth(0, 0)
 
+
     def showItem(self, title, field):
         """ Show Item field"""
         if field in ('size', 'totalsize'):
-            minvalue = self.__mini[field].convertSize(
+            minvalue = convertSize(
                 getattr(self.__mini[field], field))
-            maxvalue = self.__maxi[field].convertSize(
+            maxvalue = convertSize(
                 getattr(self.__maxi[field], field))
         else:
             minvalue = getattr(self.__mini[field], field)
@@ -631,6 +648,7 @@ class Packages:
         self.showItem('Used by', 'nbused')
         self.showItem('Total deps', 'nbtotaldeps')
         self.showItem('Max depths', 'maxdepth')
+        print ("All packages size: %s" % convertSize(self.allsize))
 
     def showColumn(self):
         """Show list packages in column"""
@@ -659,8 +677,8 @@ class Packages:
                     p.nbtotaldeps,
                     p.maxdepth,
                     p.nbused,
-                    p.convertSize(p.size),
-                    p.convertSize(p.totalsize),
+                    convertSize(p.size),
+                    convertSize(p.totalsize),
                     "#" * int((p.totalsize / float(maxtsize)) * 10)))
 
     def sortBy(self, sortby):
@@ -802,6 +820,7 @@ def loadPkgInfo(forceupdate):
         packages = getPkgList()
         packages.analyzeDependencies()
         packages.calcStats()
+        packages.calcFullSize()
 
         # Serialize the packages object
         oldlimit = sys.getrecursionlimit()
