@@ -19,7 +19,7 @@ counters = {}
 
 
 def getCounter(name, inc=1):
-    """Global counter"""
+    """Global counter, used for generate idx color"""
     global counters
     if name not in counters:
         counters[name] = 0
@@ -130,6 +130,7 @@ class Package:
 
     @property
     def virtual(self):
+        """ Is virtual"""
         return self.__virtual
 
     @virtual.setter
@@ -138,6 +139,7 @@ class Package:
 
     @property
     def providedby(self):
+        """Provided by"""
         return self.__providedby
 
     @providedby.setter
@@ -184,6 +186,7 @@ class Package:
         return self.pkgname
 
     def convertSize(self, s):
+        """ Convert size to human readable"""
         if s > (1000 * 1000):
             r = "%s %s" % (int(s / 1024 / 1024), "GB")
         else:
@@ -194,7 +197,6 @@ class Package:
 
         return r
 
-    # Package
     def calcGraphviz(self,
                         packages,
                         blocklist,
@@ -202,13 +204,11 @@ class Package:
                         level=0,
                         idxcolor=1,
                         duplicate=None):
-
+        """Generate dot for a package"""
         if not duplicate:
             duplicate = []
 
         s = ""
-
-        size = len(packages)
 
         mini = packages[20].nbused
         mini1 = packages[40].nbused
@@ -315,109 +315,8 @@ label = "%s (%s - %s)";\n' %\
 
         return s
 
-    def showGraphviz(self, blocklist=None,
-                     endlevel=99, level=0, idxcolor=1, duplicate=None):
-
-        if not blocklist:
-            blocklist = []
-
-        if not duplicate:
-            duplicate = []
-
-        s = ""
-
-        # If a virtual package, get a provided package
-        p = self.realpkg
-
-        # Check if allready exist
-        exists = True
-        if p not in duplicate:
-            exists = False
-            p.idxcolor = idxcolor
-            duplicate.append(p)
-
-        subgraph = False
-        if p in blocklist:
-            subgraph = True
-            s += "subgraph cluster_%s { colorscheme=set312;style=filled;\
-fillcolor=%s;fontsize=128;label = \"%s\";\n" %\
-                (getCounter('cluster'),
-                 (getCounter('idxcolor') % 12) + 1,
-                 p.pkgname)
-
-        # Check if manual installation for calc color
-        ccolor = (p.idxcolor % 8) + 2
-        if p.manualinstalled:
-            if len(p.deps) == 0:
-                ccolor = 1
-            else:
-                found = False
-                for t in p.deps:
-                    if t.idxcolor != -1:
-                        found = True
-                if found:
-                    ccolor = 1
-
-        if not exists:
-            opts = ""
-            if p.manualinstalled:
-                opts = "shape=house"
-
-            if self.virtual:
-                opts = "shape=diamond"
-
-            if self.virtual:
-                s += '"%s"[label="L:%s %s(by %s){%s}\n%s\n%s" %s  fillcolor=%s];\n' %\
-                    (self.pkgname,
-                     level,
-                     self.pkgname,
-                     p.pkgname,
-                     p.idxcolor,
-                     p.convertSize(p.size),
-                     p.convertSize(p.totalsize),
-                     opts,
-                     ccolor)
-            else:
-                s += '"%s"[label="L:%s %s/{%s}\n%s\n%s" %s fillcolor=%s];\n' %\
-                    (p.pkgname,
-                     level,
-                     self.pkgname,
-                     p.idxcolor,
-                     p.convertSize(p.size),
-                     p.convertSize(p.totalsize),
-                     opts,
-                     ccolor)
-
-        level += 1
-        for o in p.deps:
-            d = o.realpkg
-            if d.idxcolor == -1:
-                d.idxcolor = idxcolor
-
-            exists = True
-            if d not in duplicate:
-                exists = False
-
-            ccolor = (p.idxcolor % 8) + 2
-            if not exists:
-                if o.virtual:
-                    s += '"%s" [label="%s(by %s)/{%s}\n%s\n%s" shape=diamond fillcolor=%s];\n' %\
-                        (d.pkgname, o.pkgname, d.pkgname, d.idxcolor, d.convertSize(d.size), d.convertSize(d.totalsize), ccolor)
-                else:
-                    s += '"%s" [label="%s/{%s}\n%s\n%s" fillcolor=%s];\n' % (o.pkgname, o.pkgname, idxcolor, d.convertSize(d.size), d.convertSize(d.totalsize), ccolor)
-
-            s += '"%s" -> "%s";\n' % (p.pkgname, d.pkgname)
-
-            if not exists:
-                duplicate.append(d)
-                s += d.showGraphviz(blocklist,endlevel, level, idxcolor, duplicate)
-
-        if subgraph:
-            s += "}/* bruno */\n"
-
-        return s
-
-    def showDeps(self, level=0, pkglist=None):
+    def showTreeDeps(self, level=0, pkglist=None):
+        """Show the tree deps for a package"""
         s = ""
 
         if not pkglist:
@@ -461,12 +360,12 @@ fillcolor=%s;fontsize=128;label = \"%s\";\n" %\
 
             if p.pkgname not in pkglist:
                 pkglist.append(p.pkgname)
-                s += p.showDeps(level, pkglist)
+                s += p.showTreeDeps(level, pkglist)
 
         return s
 
     def searchMaxDepth(self, current=0, maxlevel=0, result=None ):
-
+        """Search the max depth for a package"""
         if not result:
             result = []
         rp = self.realpkg
@@ -488,6 +387,7 @@ fillcolor=%s;fontsize=128;label = \"%s\";\n" %\
         return maxlevel
 
     def calcAllDeps(self, uniq=None, current=0):
+        """Calc all deps for a package"""
         if not uniq:
             uniq = []
 
@@ -501,6 +401,7 @@ fillcolor=%s;fontsize=128;label = \"%s\";\n" %\
             self.__alldeps = uniq
 
     def calcNbTotalSize(self):
+        """Calc a total size for a package"""
         totalsize = 0
         for d in self.__alldeps:
             totalsize += d.size
@@ -508,26 +409,17 @@ fillcolor=%s;fontsize=128;label = \"%s\";\n" %\
         self.totalsize = totalsize
 
     def addDeps(self, obj):
+        """Add package object in deps object"""
         if obj not in self.__deps:
             self.__deps.append(obj)
 
     def addUsedBy(self, obj):
+        """Add package object in used object"""
         if obj not in self.__usedby:
             self.__usedby.append(obj)
 
-    def getidxcolor4Useby(self):
-        idxcolor = -1
-
-        for o in self.__usedby:
-            p = o.realpkg
-            if p.idxcolor != -1 and idxcolor == -1:
-                idxcolor = p.idxcolor
-
-        return idxcolor
-
-
 class Packages:
-
+    """ Packages object"""
     @property
     def mini(self):
         return self.__mini
@@ -562,6 +454,7 @@ class Packages:
         return self.mylist.__repr__()
 
     def __compareField(self, field, obj):
+        """Private method for searching min/max value"""
         # Mini
         if not obj.virtual:
             if field not in self.__mini:
@@ -579,19 +472,21 @@ class Packages:
                     self.__maxi[field] = obj
 
     def getPkgByName(self, pkgname):
+        """Return package object by pkgname"""
         for o in self.mylist:
             if o.pkgname == pkgname:
                 return o
         return None
 
     def __contains__(self, obj):
+        """search pkg object"""
         for o in self.mylist:
             if o == obj:
                 return o
         return None
 
     def beforeGraph(self):
-
+        """Generate top dot file"""
         s = 'digraph G0 {\n'
         s += "forcelabels=true;\n"
         s += "rankdir=TB;\n"
@@ -602,12 +497,13 @@ class Packages:
         return s
 
     def afterGraph(self):
+        """Generate end dot file"""
         s = ("}")
 
         return s
 
-    # Packages
     def calcGraphviz(self, tograph=None, blocklist=None, endlevel=99):
+        """Generate dot for packages"""
         if not tograph:
             tograph = []
 
@@ -628,27 +524,8 @@ class Packages:
 
         return r
 
-    def showGraphviz(self, pkglist=None, blocklist=None, endlevel=99):
-        if not pkglist:
-            pkglist = []
-
-        if not blocklist:
-            blocklist = []
-
-        # reset idxcolor
-        for o in pkglist:
-            o.idxcolor = -1
-
-        r = ""
-        idxcolor = 0
-        duplicate = [None]
-        for o in pkglist:
-            idxcolor += 1
-            r += o.showGraphviz(blocklist, endlevel, 0, idxcolor, duplicate)
-
-        return r
-
     def filterManualInstall(self, search=True):
+        """Filter packages by manual install"""
         result = Packages()
         for o in self.mylist:
             if o.manualinstalled == search:
@@ -657,6 +534,7 @@ class Packages:
         return result
 
     def filterNbDeps(self, minsearch, maxsearch=9999, maxlevel=99):
+        """Filter packages by nbdeps (range)"""
         result = Packages()
         for o in self.mylist:
             if o.filterNbDeps(minsearch, maxsearch, maxlevel):
@@ -665,6 +543,7 @@ class Packages:
         return result
 
     def filterByNbProvides(self, minsearch, maxsearch):
+        """Filter packages by nbprovides (range)"""
         result = Packages()
         for o in self.mylist:
             if o.nbprovides >= minsearch and o.nbprovides <= maxsearch:
@@ -673,6 +552,7 @@ class Packages:
         return result
 
     def filterByNbUsed(self, minsearch, maxsearch=9999):
+        """Filter packages by nbused (range)"""
         result = Packages()
         for o in self.mylist:
             if o.nbused >= minsearch and o.nbused <= maxsearch:
@@ -680,8 +560,8 @@ class Packages:
 
         return result
 
-    def analyseDependencies(self):
-
+    def analyzeDependencies(self):
+        """Analyze and populate datas"""
         # Calc provide package
         for p in self.mylist:
             for d in p.raw_provides:
@@ -707,6 +587,7 @@ class Packages:
         self.searchMaxDepth()
 
     def calcStats(self):
+        """Calc and Seach Min/Max"""
         for p in self.mylist:
             # Calc dependencies
             p.calcAllDeps()
@@ -719,7 +600,13 @@ class Packages:
             self.__compareField('nbtotaldeps', p)
             self.__compareField('maxdepth', p)
 
+    def searchMaxDepth(self):
+        """Calc maxdep for all packages"""
+        for p in self.mylist:
+            p.maxdepth = p.searchMaxDepth(0, 0)
+
     def showItem(self, title, field):
+        """ Show Item field"""
         if field in ('size', 'totalsize'):
             minvalue = self.__mini[field].convertSize(
                 getattr(self.__mini[field], field))
@@ -737,6 +624,7 @@ class Packages:
                 ))
 
     def showInfo(self):
+        """Show summary infos"""
         print ("Packages installed: %s" % len(self.mylist))
         self.showItem("Size", 'size')
         self.showItem("Total Size", 'totalsize')
@@ -745,6 +633,7 @@ class Packages:
         self.showItem('Max depths', 'maxdepth')
 
     def showColumn(self):
+        """Show list packages in column"""
         maxtsize = 0
         for p in self.mylist:
             maxtsize = max(maxtsize, p.totalsize)
@@ -774,11 +663,8 @@ class Packages:
                     p.convertSize(p.totalsize),
                     "#" * int((p.totalsize / float(maxtsize)) * 10)))
 
-    def searchMaxDepth(self):
-        for p in self.mylist:
-            p.maxdepth = p.searchMaxDepth(0, 0)
-
     def sortBy(self, sortby):
+        """Sort by package property"""
         if sortby != "":
             if sortby == "name":
                 self.sortByName()
@@ -826,15 +712,14 @@ def sysexec(cmdLine):
     return cmd.read()
 
 
-def getPkgListNew(filter=""):
-    global spkg
-    global slimit
+def getPkgList(sfilter=""):
+    """Load package list from pacman -Qi command"""
     packages = Packages()
     current_pkg = None
     begin_tag_count = 0
     end_tag_count = 1
 
-    output = sysexec("LC_ALL=C pacman -Qi %s 2>>/dev/null" % (filter))
+    output = sysexec("LC_ALL=C pacman -Qi %s 2>>/dev/null" % (sfilter))
     lines = output.split('\n')
 
     for line in lines:
@@ -847,7 +732,6 @@ def getPkgListNew(filter=""):
                 raise Exception('no found end tag')
 
             if m.group(1):
-                begin_tag = 1
                 pkgname = m.group(1)
 
                 if pkgname not in packages:
@@ -863,7 +747,8 @@ def getPkgListNew(filter=""):
         # Search manual installation
         m = re.match(r'^Install Reason +: +(.+)', line)
         if m:
-            current_pkg.manualinstalled = (m.group(1) == "Explicitly installed")
+            current_pkg.manualinstalled = (
+                m.group(1) == "Explicitly installed")
 
         # Search provide package
         m = re.match(r'^Provides +: +(.+)', line)
@@ -908,13 +793,14 @@ def getPkgListNew(filter=""):
 
 
 def loadPkgInfo(forceupdate):
+    """Load and cache a packages list"""
     if not forceupdate and os.path.exists('/tmp/packages'):
         packages = pickle.load(open('/tmp/packages', 'rb'))
     else:
         # Parse all installed packages
         print ("Caching the package list, please wait ...")
-        packages = getPkgListNew()
-        packages.analyseDependencies()
+        packages = getPkgList()
+        packages.analyzeDependencies()
         packages.calcStats()
 
         # Serialize the packages object
@@ -927,6 +813,7 @@ def loadPkgInfo(forceupdate):
 
 
 def generateGraph(packages, findpkg, filename):
+    """ Generate a dot graphviz"""
     subgraph = []
     subgraph.append(packages.getPkgByName('kdebase-runtime'))
     subgraph.append(packages.getPkgByName('kdebase-workspace'))
@@ -948,6 +835,7 @@ def generateGraph(packages, findpkg, filename):
 
 
 def searchPackage(packages, pkgnames):
+    """Search package by pkgname"""
     findpkg = []
     pkglist = pkgnames.split(",")
     for p in pkglist:
@@ -958,9 +846,10 @@ def searchPackage(packages, pkgnames):
     return findpkg
 
 
-def showDeps(p):
+def showTreeDeps(p):
+    """Show tree dependencies"""
     if p:
-        print(p.showDeps())
+        print(p.showTreeDeps())
 
 
 def usage():
@@ -1034,7 +923,7 @@ def main():
 
     if action == "tree":
         if findpkg:
-            showDeps(findpkg[0])
+            showTreeDeps(findpkg[0])
         else:
             print ("Package not found")
 
