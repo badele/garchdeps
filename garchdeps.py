@@ -10,6 +10,7 @@ import re
 import sys
 import pickle
 import getopt
+import unittest
 
 # Parameters
 debug = 0
@@ -432,14 +433,14 @@ class Packages:
         return self.__maxi
 
     @property
-    def allsize(self):
-        return self.__allsize
+    def fullsize(self):
+        return self.__fullsize
 
     def __init__(self, initvalue=()):
         self.mylist = []
         self.__mini = {}
         self.__maxi = {}
-        self.__allsize = 0
+        self.__fullsize = 0
         for x in initvalue:
             self.append(x)
 
@@ -600,7 +601,7 @@ class Packages:
         for p in self.mylist:
             size += p.size
 
-        self.__allsize = size
+        self.__fullsize = size
 
     def calcStats(self):
         """Calc and Seach Min/Max"""
@@ -648,7 +649,8 @@ class Packages:
         self.showItem('Used by', 'nbused')
         self.showItem('Total deps', 'nbtotaldeps')
         self.showItem('Max depths', 'maxdepth')
-        print ("All packages size: %s" % convertSize(self.allsize))
+        print ("All packages size: %s" % convertSize(self.fullsize))
+
 
     def showColumn(self):
         """Show list packages in column"""
@@ -714,6 +716,67 @@ class Packages:
         self.mylist.sort(key=lambda p: p.totalsize, reverse=True)
 
 
+# Test here due error pickle if i use test in test.py file
+class TestPackages(unittest.TestCase):
+    def setUp(self):
+        """Before unittest"""
+        pwd = os.path.dirname(__file__)
+        filename = "%s/%s" % (pwd, "packages")
+        self.__allpackages = loadPkgInfo(filename, False)
+
+    def test_nbpackages(self):
+        self.assertEqual(len(self.__allpackages), 1568)
+
+    def test_fullsize(self):
+        self.assertEqual(self.__allpackages.fullsize, 10671164)
+
+    def test_maxiobject(self):
+        self.assertEqual(self.__allpackages.maxi['size'].pkgname,
+                         'microchip-mplabx-bin')
+        self.assertEqual(self.__allpackages.maxi['totalsize'].pkgname,
+                         'kdevelop')
+        self.assertEqual(self.__allpackages.maxi['nbused'].pkgname,
+                         'glibc')
+        self.assertEqual(self.__allpackages.maxi['nbtotaldeps'].pkgname,
+                         'kipi-plugins')
+        self.assertEqual(self.__allpackages.maxi['maxdepth'].pkgname,
+                         'kdevelop')
+
+    def test_minobject(self):
+        self.assertEqual(self.__allpackages.mini['size'].pkgname,
+                         'xclm-dirs')
+        self.assertEqual(self.__allpackages.mini['totalsize'].pkgname,
+                         'yelp-xsl')
+        self.assertEqual(self.__allpackages.mini['nbused'].pkgname,
+                         'zsh')
+        self.assertEqual(self.__allpackages.mini['nbtotaldeps'].pkgname,
+                         'yelp-xsl')
+        self.assertEqual(self.__allpackages.mini['maxdepth'].pkgname,
+                         'yelp-xsl')
+
+    def test_maxivalue(self):
+        self.assertEqual(self.__allpackages.maxi['size'].size,
+                         566304.0)
+        self.assertEqual(self.__allpackages.maxi['totalsize'].totalsize,
+                         1502348.0)
+        self.assertEqual(self.__allpackages.maxi['nbused'].nbused,
+                         177)
+        self.assertEqual(self.__allpackages.maxi['nbtotaldeps'].nbtotaldeps,
+                         296)
+        self.assertEqual(self.__allpackages.maxi['maxdepth'].maxdepth,
+                         16)
+
+    def test_minivalue(self):
+        self.assertEqual(self.__allpackages.mini['size'].size,
+                         0)
+        self.assertEqual(self.__allpackages.mini['totalsize'].totalsize,
+                         0.0)
+        self.assertEqual(self.__allpackages.mini['nbused'].nbused,
+                         0)
+        self.assertEqual(self.__allpackages.mini['nbtotaldeps'].nbtotaldeps,
+                         0)
+        self.assertEqual(self.__allpackages.mini['maxdepth'].maxdepth,
+                         0)
 
 
 def cmp_pkgused(p1, p2):
@@ -810,10 +873,10 @@ def getPkgList(sfilter=""):
     return packages
 
 
-def loadPkgInfo(forceupdate):
+def loadPkgInfo(filename, forceupdate):
     """Load and cache a packages list"""
-    if not forceupdate and os.path.exists('/tmp/packages'):
-        packages = pickle.load(open('/tmp/packages', 'rb'))
+    if not forceupdate and os.path.exists(filename):
+        packages = pickle.load(open(filename, 'rb'))
     else:
         # Parse all installed packages
         print ("Caching the package list, please wait ...")
@@ -825,7 +888,7 @@ def loadPkgInfo(forceupdate):
         # Serialize the packages object
         oldlimit = sys.getrecursionlimit()
         sys.setrecursionlimit(10000)
-        pickle.dump(packages, open('/tmp/packages', 'wb'))
+        pickle.dump(packages, open(filename, 'wb'))
         sys.setrecursionlimit(oldlimit)
 
     return packages
@@ -889,7 +952,7 @@ def main():
             sys.argv[1:],
             "hiug:tn:f:s:",
             ["help", "info", "update", "graph=", "tree",
-             "nblines=", "find=", "sortby="])
+             "nblines=", "find=", "sortby=", "test"])
     except getopt.GetoptError:
         usage()
         sys.exit(2)
@@ -931,11 +994,16 @@ def main():
         if opt in ("-i", "--info"):
             action = "info"
 
+        if opt in ("--test"):
+            action = "test"
+            sys.argv = [ sys.argv[0] ]
+            unittest.main(verbosity=2)
+
         if opt in ("-h", "--help"):
             usage()
             sys.exit()
 
-    allpackages = loadPkgInfo(actionforceupdate)
+    allpackages = loadPkgInfo("/tmp/packages", actionforceupdate)
 
     if actionfind:
         findpkg = searchPackage(allpackages, pkgnames)
