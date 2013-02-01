@@ -3,6 +3,7 @@
 
 # Sample commands
 # ./garchdeps.py -f qt -g /tmp/graph.dot  ; tred /tmp/graph.dot | dot -Tpng  -o /tmp/graph.png
+# ./garchdeps.py -rf qt -g /tmp/graph.dot  ; tred /tmp/graph.dot | dot -Tpng  -o /tmp/graph.png
 
 # Import files
 import os
@@ -918,14 +919,13 @@ def generateGraph(packages, findpkg, filename):
 
 def searchPackage(packages, pkgnames):
     """Search package by pkgname"""
-    findpkg = []
     pkglist = pkgnames.split(",")
     for p in pkglist:
         f = packages.getPkgByName(p)
         if f:
-            findpkg.append(f)
+            return f
 
-    return findpkg
+    return None
 
 
 def showTreeDeps(p):
@@ -950,21 +950,22 @@ def main():
     try:
         opts, args = getopt.getopt(
             sys.argv[1:],
-            "hiug:tn:f:s:",
+            "hiug:tn:f:s:r",
             ["help", "info", "update", "graph=", "tree",
-             "nblines=", "find=", "sortby=", "test"])
+             "nblines=", "find=", "sortby=", "reverse", "test",])
     except getopt.GetoptError:
         usage()
         sys.exit(2)
 
     n = 20  # number line showed
     actionfind = False
+    actionreverse = False
     actionforceupdate = False
     findpkg = None
     action = ""
     pkgnames = ""
     filename = ""
-    sortby = "nusedby"
+    sortby = "size"
 
     for opt, arg in opts:
         if opt in ("-n", "--nblines"):
@@ -994,37 +995,52 @@ def main():
         if opt in ("-i", "--info"):
             action = "info"
 
-        if opt in ("--test"):
+        if opt in ("", "--test"):
             action = "test"
-            sys.argv = [ sys.argv[0] ]
-            unittest.main(verbosity=2)
+
+        if opt in ("-r", "--reverse"):
+            actionreverse = True
 
         if opt in ("-h", "--help"):
             usage()
             sys.exit()
 
     allpackages = loadPkgInfo("/tmp/packages", actionforceupdate)
+    findpkg = None
+    packages = Packages()
 
     if actionfind:
         findpkg = searchPackage(allpackages, pkgnames)
+        if not actionreverse:
+            packages.append(findpkg)
+        else:
+            packages = findpkg.usedby
 
     if action == "tree":
         if findpkg:
-            showTreeDeps(findpkg[0])
+            showTreeDeps(findpkg)
         else:
             print ("Package not found")
 
-    if sortby != "":
-        allpackages.sortBy(sortby)
 
     if action == "graph":
-        generateGraph(allpackages, findpkg, filename)
+        allpackages.sortBy("nusedby")
+        generateGraph(allpackages, packages, filename)
 
     if action == "info":
         allpackages.showInfo()
 
     if action == "":
-        allpackages[:n].showColumn()
+        if findpkg:
+            pkgs = findpkg[0].usedby
+            pkgs.showColumn()
+        else:
+            allpackages.sortBy(sortby)
+            allpackages[:n].showColumn()
+
+    if action == "test":
+        sys.argv = [sys.argv[0]]
+        unittest.main(verbosity=2)
 
 
 if __name__ == "__main__":
