@@ -5,6 +5,7 @@
 # ./garchdeps.py -f qt -g /tmp/graph.dot  ; tred /tmp/graph.dot | dot -Tpng  -o /tmp/graph.png
 # ./garchdeps.py -rf qt -g /tmp/graph.dot  ; tred /tmp/graph.dot | dot -Tpng  -o /tmp/graph.png
 
+
 # Import files
 import os
 import re
@@ -12,6 +13,7 @@ import sys
 import pickle
 import getopt
 import unittest
+import pprint
 
 # Parameters
 debug = 0
@@ -34,7 +36,7 @@ def getCounter(name, inc=1):
 def convertSize(s):
     """ Convert size to human readable"""
     if s > (1000 * 1000):
-        r = "%s %s" % (int(s / 1024 / 1024), "GB")
+        r = "%s %s" % ("{0:.2f}".format((s / 1024 / 1024)), "GB")
     else:
         if s > 1000:
             r = "%s %s" % (int(s / 1024), "MB")
@@ -83,6 +85,17 @@ class Package:
         return len(self.__alldeps)
 
     @property
+    def linkeddeps(self):
+        """ All dependencies object used only by me"""
+        return self.__linkeddeps
+
+    @property
+    def all_linkeddeps(self):
+        """ All dependencies object used only by me"""
+        return self.__all_linkeddeps
+
+
+    @property
     def raw_provides(self):
         """ All provides packages during parsing pacman -Qi out"""
         return self.__raw_provides
@@ -91,6 +104,11 @@ class Package:
     def deps(self):
         """ Dependencies objects"""
         return self.__deps
+
+    @property
+    def topreverse(self):
+        """Top reverse dependencies"""
+        return self.__topreverse
 
     @property
     def maxdepth(self):
@@ -121,9 +139,24 @@ class Package:
         self.__size = value
 
     @property
-    def totalsize(self):
+    def depssize(self):
         """Total size of dependencies packages"""
-        return self.__totalsize
+        return self.__depssize
+
+    @property
+    def all_linkeddeps_totalsize(self):
+        """Size of package only used by me"""
+        return self.all_linkeddeps.fullsize
+
+    @property
+    def totalsize(self):
+        """Size of all package dependencies"""
+        return self.size + self.all_linkeddeps_totalsize
+
+    # @property
+    # def depssize(self):
+    #     """Total size of dependencies - only used by me"""
+    #     return self.totalsize - self.only_byme_totalsize
 
     @property
     def provides(self):
@@ -184,11 +217,16 @@ class Package:
         """ Initialisation variable"""
         self.__pkgname = pkgname
         self.__size = 0
-        self.__totalsize = 0
+        self.__depssize = 0
+        self.__linkeddeps_totalsize = 0
         self.__virtual = False
         self.__provides = Packages()
         self.__raw_provides = []
         self.__deps = Packages()
+        self.__topreverse = Packages()
+        self.__linkeddeps = Packages()
+        self.__all_linkeddeps = Packages()
+        self.__isuniquedep = False
         self.__raw_deps = []
         self.__alldeps = []
         self.__maxdepth = 0
@@ -203,12 +241,13 @@ class Package:
 
 
     def calcGraphviz(self,
-                        packages,
-                        blocklist,
-                        endlevel=99,
-                        level=0,
-                        idxcolor=1,
-                        duplicate=None):
+                     package,
+                     packages,
+                     blocklist,
+                     endlevel=99,
+                     level=0,
+                     idxcolor=1,
+                     duplicate=None):
         """Generate dot for a package"""
         if not duplicate:
             duplicate = []
@@ -237,12 +276,13 @@ label = "%s (%s - %s)";\n' %\
                  (getCounter('idxcolor') % 8) + 1,
                  p.pkgname,
                  convertSize(p.size),
-                 convertSize(p.totalsize)
+                 convertSize(p.depssize)
                  )
 
         fillcolor = ""
         if level == 0:
             fillcolor = ', fillcolor="red2", color="red2"'
+
 
         if not exists:
             nbused = p.nbused
@@ -256,7 +296,6 @@ label = "%s (%s - %s)";\n' %\
                     opts = 'fontsize=45'
                     if fillcolor == "":
                         opts += ', fillcolor="deeppink", color="deeppink"'
-
             else:
                 opts = 'fontsize=10'
 
@@ -264,20 +303,22 @@ label = "%s (%s - %s)";\n' %\
                 opts += fillcolor
 
             if self.virtual:
-                s += '"%s" [label="%s(by %s)\\n%s\\n%s" %s];\n' %\
+                s += '"%s" [label="%s(by %s)\\n%s + %s\\n%s" %s];\n' %\
                     (self.pkgname,
                      self.pkgname,
                      p.pkgname,
                      convertSize(p.size),
-                     convertSize(p.totalsize),
+                     convertSize(p.all_linkeddeps_totalsize),
+                     convertSize(p.depssize),
                      opts
                      )
             else:
-                s += '"%s" [label="%s\\n%s\\n%s" %s];\n' %\
+                s += '"%s" [label="%s\\n%s + %s\\n%s" %s];\n' %\
                     (p.pkgname,
                      self.pkgname,
                      convertSize(p.size),
-                     convertSize(p.totalsize),
+                     convertSize(p.all_linkeddeps_totalsize),
+                     convertSize(p.depssize),
                      opts
                      )
 
@@ -290,6 +331,7 @@ label = "%s (%s - %s)";\n' %\
                 exists = False
 
             if not exists:
+                fillcolor = ""
                 nbused = d.nbused
                 if nbused > mini1:
                     opts = 'fontsize=30, fillcolor="deepskyblue", color="deepskyblue"'
@@ -297,23 +339,26 @@ label = "%s (%s - %s)";\n' %\
                         opts = 'fontsize=45, fillcolor="deeppink", color="deeppink"'
                 else:
                     opts = 'fontsize=10'
+                    if o in package.all_linkeddeps or d in package.all_linkeddeps:
+                        opts += ', fillcolor="chartreuse3", color="chartreuse3"'
 
                 if o.virtual:
-                    s += '"%s" [label="%s(by %s)\\n%s\\n%s" %s];\n' %\
-                        (d.pkgname, o.pkgname, d.pkgname, convertSize(d.size), convertSize(d.totalsize), opts)
+                    s += '"%s" [label="%s(by %s)\\n%s + %s\\n%s" %s];\n' %\
+                        (d.pkgname, o.pkgname, d.pkgname, convertSize(d.size),convertSize(d.all_linkeddeps_totalsize), convertSize(d.depssize), opts)
                 else:
-                    s += '"%s" [label="%s\\n%s\\n%s" %s];\n' % (o.pkgname, o.pkgname, convertSize(d.size), convertSize(d.totalsize), opts)
+                    s += '"%s" [label="%s\\n%s + %s\\n%s" %s];\n' % (o.pkgname, o.pkgname, convertSize(d.size),convertSize(d.all_linkeddeps_totalsize), convertSize(d.depssize), opts)
 
             s += '"%s" -> "%s";\n' % (p.pkgname, d.pkgname)
 
             if not exists:
                 duplicate.append(d)
-                s += d.calcGraphviz(packages,
-                                       blocklist,
-                                       endlevel,
-                                       level,
-                                       idxcolor,
-                                       duplicate)
+                s += d.calcGraphviz(package,
+                                    packages,
+                                    blocklist,
+                                    endlevel,
+                                    level,
+                                    idxcolor,
+                                    duplicate)
 
         if subgraph:
             s += "}/* bruno */\n"
@@ -405,13 +450,34 @@ label = "%s (%s - %s)";\n' %\
         if current == 0:
             self.__alldeps = uniq
 
-    def calcNbTotalSize(self):
+
+    def calcLinkedDeps(self,counttotaldeps):
+        # Search unique dependencie for a package
+        # self.counttotaldeps
+        print ("-- Calcul pour %s" % self.pkgname)
+        for p in self.__alldeps:
+            print ("CHECK pour %s" % p)
+            if p in counttotaldeps and counttotaldeps[p] == 1 and p.nbused <= 1:
+                p.isuniquedep = True
+                self.linkeddeps.append(p)
+
+    def calcDepsSize(self):
         """Calc a total size for a package"""
         totalsize = 0
         for d in self.__alldeps:
-            totalsize += d.size
+            if d not in self.linkeddeps:
+                totalsize += d.size
 
-        self.totalsize = totalsize
+        self.__depssize = totalsize
+
+    # def calcAllOnlyByMeTotalSize(self):
+    #     """Calc a total size for a package"""
+    #     totalsize = 0
+    #     for d in self.__all_only_byme:
+    #         totalsize += d.size
+
+    #     self.all_only_byme_totalsize = totalsize
+
 
     def addDeps(self, obj):
         """Add package object in deps object"""
@@ -422,6 +488,7 @@ label = "%s (%s - %s)";\n' %\
         """Add package object in used object"""
         if obj not in self.__usedby:
             self.__usedby.append(obj)
+
 
 class Packages:
     """ Packages object"""
@@ -434,13 +501,19 @@ class Packages:
         return self.__maxi
 
     @property
+    def counttotaldeps(self):
+        return self.__counttotaldeps
+
+    @property
     def fullsize(self):
+
         return self.__fullsize
 
     def __init__(self, initvalue=()):
         self.mylist = []
         self.__mini = {}
         self.__maxi = {}
+        self.__counttotaldeps = {}
         self.__fullsize = 0
         for x in initvalue:
             self.append(x)
@@ -525,13 +598,14 @@ class Packages:
         duplicate = [None]
         for o in tograph:
             idxcolor += 1
-            r += o.calcGraphviz(self,
-                                   blocklist,
-                                   endlevel,
-                                   0,
-                                   idxcolor,
-                                   duplicate)
-
+            r += o.calcGraphviz(o,
+                                self,
+                                blocklist,
+                                endlevel,
+                                0,
+                                idxcolor,
+                                duplicate)
+            
         return r
 
     def filterManualInstall(self, search=True):
@@ -590,6 +664,13 @@ class Packages:
                 if r:
                     p.deps.append(r)
                     r.usedby.append(p)
+
+                    tp = r.realpkg
+                    # print ("PKG:%s(%s) REAL:%s(%s)" % (r,r.size, tp, tp.size))
+                    if tp not in self.counttotaldeps:
+                        self.counttotaldeps[tp] = 1
+                    else:
+                        self.counttotaldeps[tp] += 1
                 else:
                     print ("Paquet de dependance non trouve %s" % d)
 
@@ -604,17 +685,39 @@ class Packages:
 
         self.__fullsize = size
 
+    def calcAllDeps(self):
+        for p in self.mylist:
+            p.calcAllDeps()
+
+    def calcTopReverse(self):
+        for p in self.mylist:
+            if p.nbused == 0:
+                print ("Calc deps for %s" % p)
+                for r in p.alldeps:
+                    if p not in r.topreverse:
+                        r.topreverse.append(p)
+
+    def calcAllLinkedDeps(self):
+        for p in self.mylist:
+            for a in p.alldeps:
+                if len(a.topreverse) == 1 and p in a.topreverse:
+                    print ("Ajout de %s à %s" % (a, p))
+                    p.all_linkeddeps.append(a)
+
     def calcStats(self):
         """Calc and Seach Min/Max"""
         for p in self.mylist:
             # Calc dependencies
-            p.calcAllDeps()
-            p.calcNbTotalSize()
+            #p.calcOnlyByMe(self.counttotaldeps)
+            p.calcDepsSize()
+            p.all_linkeddeps.calcFullSize()
+
 
             # Calc mini/maxi
             self.__compareField('size', p)
-            self.__compareField('totalsize', p)
+            self.__compareField('depssize', p)
             self.__compareField('nbused', p)
+            self.__compareField('all_linkeddeps_totalsize', p)
             self.__compareField('nbtotaldeps', p)
             self.__compareField('maxdepth', p)
 
@@ -626,7 +729,7 @@ class Packages:
 
     def showItem(self, title, field):
         """ Show Item field"""
-        if field in ('size', 'totalsize'):
+        if field in ('size', 'depssize', 'all_linkeddeps_totalsize'):
             minvalue = convertSize(
                 getattr(self.__mini[field], field))
             maxvalue = convertSize(
@@ -646,7 +749,7 @@ class Packages:
         """Show summary infos"""
         print ("Packages installed: %s" % len(self.mylist))
         self.showItem("Size", 'size')
-        self.showItem("Total Size", 'totalsize')
+        self.showItem("Total O. Size", 'all_linkeddeps_totalsize')
         self.showItem('Used by', 'nbused')
         self.showItem('Total deps', 'nbtotaldeps')
         self.showItem('Max depths', 'maxdepth')
@@ -659,29 +762,33 @@ class Packages:
         for p in self.mylist:
             maxtsize = max(maxtsize, p.totalsize)
 
-        print ('-----------------------------------------+---------+\
-----------+----------+----------+-----------+------------+' )
+        separator = '-----------------------------------------+---------+\
+----------+----------+----------+----------+----------+----------+------------+'
+        print (separator)
 
-        print ('%-40s | %-7s | %-8s | %-8s | %-8s | %-9s | %10s |' %
+        print ('%-40s | %-7s | %-8s | %-8s | %8s | %8s | %8s | %8s | %10s |' %
                ("Package",
                 "T. Deps",
                 "N. depth",
                 "N usedby",
-                " Size",
+                "P. Size",
+                "O. Size",
                 "T. Size",
+                "D. Size",
                 "% T. Size"))
 
-        print ('-----------------------------------------+---------+\
-----------+----------+----------+-----------+------------+' )
+        print (separator)
 
         for p in self.mylist:
-            print ('%-40s | %7d | %8d | %8d | %8s | %9s | %-10s |' %
+            print ('%-40s | %7d | %8d | %8d | %8s | %8s | %8s | %8s | %-10s |' %
                    (p.pkgname,
                     p.nbtotaldeps,
                     p.maxdepth,
                     p.nbused,
                     convertSize(p.size),
+                    convertSize(p.all_linkeddeps_totalsize),
                     convertSize(p.totalsize),
+                    convertSize(p.depssize),
                     "#" * int((p.totalsize / float(maxtsize)) * 10)))
 
     def sortBy(self, sortby):
@@ -697,6 +804,8 @@ class Packages:
                 self.sortBySize()
             if sortby == "tdeps":
                 self.sortByTotalDeps()
+            if sortby == "linkdepdeps":
+                self.sortByLinkedDepsSize()
 
     def sortByName(self):
         self.mylist.sort(key=lambda p: p.pkgname, reverse=False)
@@ -712,6 +821,9 @@ class Packages:
 
     def sortBySize(self):
         self.mylist.sort(key=lambda p: p.size, reverse=True)
+
+    def sortBylinkedDepsSize(self):
+        self.mylist.sort(key=lambda p: p.all_linkeddeps_totalsize, reverse=True)
 
     def sortByTotalSize(self):
         self.mylist.sort(key=lambda p: p.totalsize, reverse=True)
@@ -734,7 +846,7 @@ class TestPackages(unittest.TestCase):
     def test_maxiobject(self):
         self.assertEqual(self.__allpackages.maxi['size'].pkgname,
                          'microchip-mplabx-bin')
-        self.assertEqual(self.__allpackages.maxi['totalsize'].pkgname,
+        self.assertEqual(self.__allpackages.maxi['depssize'].pkgname,
                          'kdevelop')
         self.assertEqual(self.__allpackages.maxi['nbused'].pkgname,
                          'glibc')
@@ -746,7 +858,7 @@ class TestPackages(unittest.TestCase):
     def test_minobject(self):
         self.assertEqual(self.__allpackages.mini['size'].pkgname,
                          'xclm-dirs')
-        self.assertEqual(self.__allpackages.mini['totalsize'].pkgname,
+        self.assertEqual(self.__allpackages.mini['depssize'].pkgname,
                          'yelp-xsl')
         self.assertEqual(self.__allpackages.mini['nbused'].pkgname,
                          'zsh')
@@ -758,7 +870,7 @@ class TestPackages(unittest.TestCase):
     def test_maxivalue(self):
         self.assertEqual(self.__allpackages.maxi['size'].size,
                          566304.0)
-        self.assertEqual(self.__allpackages.maxi['totalsize'].totalsize,
+        self.assertEqual(self.__allpackages.maxi['depssize'].depssize,
                          1502348.0)
         self.assertEqual(self.__allpackages.maxi['nbused'].nbused,
                          177)
@@ -770,7 +882,7 @@ class TestPackages(unittest.TestCase):
     def test_minivalue(self):
         self.assertEqual(self.__allpackages.mini['size'].size,
                          0)
-        self.assertEqual(self.__allpackages.mini['totalsize'].totalsize,
+        self.assertEqual(self.__allpackages.mini['depssize'].depssize,
                          0.0)
         self.assertEqual(self.__allpackages.mini['nbused'].nbused,
                          0)
@@ -883,7 +995,12 @@ def loadPkgInfo(filename, forceupdate):
         print ("Caching the package list, please wait ...")
         packages = getPkgList()
         packages.analyzeDependencies()
+        packages.calcAllDeps()
+        packages.calcTopReverse()
+        packages.calcAllLinkedDeps()
+
         packages.calcStats()
+
         packages.calcFullSize()
 
         # Serialize the packages object
@@ -895,22 +1012,22 @@ def loadPkgInfo(filename, forceupdate):
     return packages
 
 
-def generateGraph(packages, findpkg, filename):
+def generateGraph(findpkg, allpackages, filename):
     """ Generate a dot graphviz"""
     subgraph = []
-    subgraph.append(packages.getPkgByName('kdebase-runtime'))
-    subgraph.append(packages.getPkgByName('kdebase-workspace'))
-    subgraph.append(packages.getPkgByName('qt'))
-    subgraph.append(packages.getPkgByName('gtk3'))
-    subgraph.append(packages.getPkgByName('wxgtk'))
+    subgraph.append(allpackages.getPkgByName('kdebase-runtime'))
+    subgraph.append(allpackages.getPkgByName('kdebase-workspace'))
+    subgraph.append(allpackages.getPkgByName('qt'))
+    subgraph.append(allpackages.getPkgByName('gtk3'))
+    subgraph.append(allpackages.getPkgByName('wxgtk'))
 
     if not findpkg:
-        findpkg = packages.filterManualInstall()[:100]
+        findpkg = allpackages.filterManualInstall()[:100]
         findpkg.sortBy('tsize')
 
-    r = packages.beforeGraph()
-    r += packages.calcGraphviz(findpkg, subgraph, 99)
-    r += packages.afterGraph()
+    r = allpackages.beforeGraph()
+    r += allpackages.calcGraphviz(findpkg, subgraph, 99)
+    r += allpackages.afterGraph()
 
     f = open(filename, 'wb')
     f.write(r)
@@ -952,7 +1069,7 @@ def main():
             sys.argv[1:],
             "hiug:tn:f:s:r",
             ["help", "info", "update", "graph=", "tree",
-             "nblines=", "find=", "sortby=", "reverse", "test",])
+             "nblines=", "find=", "sortby=", "reverse", "test"])
     except getopt.GetoptError:
         usage()
         sys.exit(2)
@@ -1022,10 +1139,9 @@ def main():
         else:
             print ("Package not found")
 
-
     if action == "graph":
         allpackages.sortBy("nusedby")
-        generateGraph(allpackages, packages, filename)
+        generateGraph(packages, allpackages, filename)
 
     if action == "info":
         allpackages.showInfo()
