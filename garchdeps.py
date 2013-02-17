@@ -85,6 +85,12 @@ class Package:
         return len(self.__alldeps)
 
     @property
+    def nblinkeddeps(self):
+        """ Total linked dependencies for this packages"""
+        return len(self.all_linkeddeps)
+
+
+    @property
     def linkeddeps(self):
         """ All dependencies object used only by me"""
         return self.__linkeddeps
@@ -144,14 +150,14 @@ class Package:
         return self.__depssize
 
     @property
-    def all_linkeddeps_totalsize(self):
+    def all_linkeddeps_size(self):
         """Size of package only used by me"""
         return self.all_linkeddeps.fullsize
 
     @property
     def totalsize(self):
         """Size of all package dependencies"""
-        return self.size + self.all_linkeddeps_totalsize
+        return self.size + self.all_linkeddeps_size
 
     # @property
     # def depssize(self):
@@ -218,7 +224,7 @@ class Package:
         self.__pkgname = pkgname
         self.__size = 0
         self.__depssize = 0
-        self.__linkeddeps_totalsize = 0
+        self.__linkeddeps_size = 0
         self.__virtual = False
         self.__provides = Packages()
         self.__raw_provides = []
@@ -308,7 +314,7 @@ label = "%s (%s - %s)";\n' %\
                      self.pkgname,
                      p.pkgname,
                      convertSize(p.size),
-                     convertSize(p.all_linkeddeps_totalsize),
+                     convertSize(p.all_linkeddeps_size),
                      convertSize(p.depssize),
                      opts
                      )
@@ -317,7 +323,7 @@ label = "%s (%s - %s)";\n' %\
                     (p.pkgname,
                      self.pkgname,
                      convertSize(p.size),
-                     convertSize(p.all_linkeddeps_totalsize),
+                     convertSize(p.all_linkeddeps_size),
                      convertSize(p.depssize),
                      opts
                      )
@@ -344,9 +350,9 @@ label = "%s (%s - %s)";\n' %\
 
                 if o.virtual:
                     s += '"%s" [label="%s(by %s)\\n%s + %s\\n%s" %s];\n' %\
-                        (d.pkgname, o.pkgname, d.pkgname, convertSize(d.size),convertSize(d.all_linkeddeps_totalsize), convertSize(d.depssize), opts)
+                        (d.pkgname, o.pkgname, d.pkgname, convertSize(d.size),convertSize(d.all_linkeddeps_size), convertSize(d.depssize), opts)
                 else:
-                    s += '"%s" [label="%s\\n%s + %s\\n%s" %s];\n' % (o.pkgname, o.pkgname, convertSize(d.size),convertSize(d.all_linkeddeps_totalsize), convertSize(d.depssize), opts)
+                    s += '"%s" [label="%s\\n%s + %s\\n%s" %s];\n' % (o.pkgname, o.pkgname, convertSize(d.size),convertSize(d.all_linkeddeps_size), convertSize(d.depssize), opts)
 
             s += '"%s" -> "%s";\n' % (p.pkgname, d.pkgname)
 
@@ -492,10 +498,9 @@ label = "%s (%s - %s)";\n' %\
 
 class Packages:
     """ Packages object"""
-    @property
-    def mini(self):
-        return self.__mini
-
+    #@property
+    # def mini(self):
+    #     return self.__mini
     @property
     def maxi(self):
         return self.__maxi
@@ -511,7 +516,7 @@ class Packages:
 
     def __init__(self, initvalue=()):
         self.mylist = []
-        self.__mini = {}
+        #self.__mini = {}
         self.__maxi = {}
         self.__counttotaldeps = {}
         self.__fullsize = 0
@@ -538,13 +543,13 @@ class Packages:
 
     def __compareField(self, field, obj):
         """Private method for searching min/max value"""
-        # Mini
-        if not obj.virtual:
-            if field not in self.__mini:
-                self.__mini[field] = obj
-            else:
-                if getattr(obj, field) <= getattr(self.__mini[field], field):
-                    self.__mini[field] = obj
+        # # Mini
+        # if not obj.virtual:
+        #     if field not in self.__mini:
+        #         self.__mini[field] = obj
+        #     else:
+        #         if getattr(obj, field) <= getattr(self.__mini[field], field):
+        #             self.__mini[field] = obj
 
         # Maxi
         if not obj.virtual:
@@ -715,8 +720,9 @@ class Packages:
             self.__compareField('size', p)
             self.__compareField('depssize', p)
             self.__compareField('nbused', p)
-            self.__compareField('all_linkeddeps_totalsize', p)
+            self.__compareField('all_linkeddeps_size', p)
             self.__compareField('nbtotaldeps', p)
+            self.__compareField('nblinkeddeps', p)
             self.__compareField('maxdepth', p)
 
     def searchMaxDepth(self):
@@ -743,9 +749,9 @@ class Packages:
         self.showItem("Total Linked deps Size",
                       "%s(%s)"
                       %
-                      (self.__maxi['all_linkeddeps_totalsize'].pkgname,
+                      (self.__maxi['all_linkeddeps_size'].pkgname,
                        convertSize(
-                    self.__maxi['all_linkeddeps_totalsize'].all_linkeddeps_totalsize)
+                    self.__maxi['all_linkeddeps_size'].all_linkeddeps_size)
                        )
                       )
         self.showItem("Max Nb used by",
@@ -759,6 +765,12 @@ class Packages:
                       %
                       (self.__maxi['nbtotaldeps'].pkgname,
                        self.__maxi['nbtotaldeps'].nbtotaldeps)
+                      )
+        self.showItem("Max linked deps",
+                      "%s(%s)"
+                      %
+                      (self.__maxi['nblinkeddeps'].pkgname,
+                       self.__maxi['nblinkeddeps'].nblinkeddeps)
                       )
         self.showItem("Max depths",
                       "%s(%s)"
@@ -783,13 +795,14 @@ class Packages:
         for p in self.mylist:
             maxtsize = max(maxtsize, p.totalsize)
 
-        separator = '-----------------------------------------+---------+\
+        separator = '-----------------------------------------+---------+---------+\
 ----------+----------+----------+----------+----------+----------+------------+'
         print (separator)
 
-        print ('%-40s | %-7s | %-8s | %-8s | %8s | %8s | %8s | %8s | %10s |' %
+        print ('%-40s | %-7s | %-7s | %-8s | %-8s | %8s | %8s | %8s | %8s | %10s |' %
                ("Package",
                 "T. Deps",
+                "L. Deps",
                 "N. depth",
                 "N usedby",
                 "P. Size",
@@ -801,13 +814,14 @@ class Packages:
         print (separator)
 
         for p in self.mylist:
-            print ('%-40s | %7d | %8d | %8d | %8s | %8s | %8s | %8s | %-10s |' %
+            print ('%-40s | %7d | %7d | %8d | %8d | %8s | %8s | %8s | %8s | %-10s |' %
                    (p.pkgname,
                     p.nbtotaldeps,
+                    p.nblinkeddeps,
                     p.maxdepth,
                     p.nbused,
                     convertSize(p.size),
-                    convertSize(p.all_linkeddeps_totalsize),
+                    convertSize(p.all_linkeddeps_size),
                     convertSize(p.totalsize),
                     convertSize(p.depssize),
                     "#" * int((p.totalsize / float(maxtsize)) * 10)))
@@ -817,16 +831,18 @@ class Packages:
         if sortby != "":
             if sortby == "name":
                 self.sortByName()
-            if sortby == "nusedby":
+            if sortby == "nbused":
                 self.sortByNbUsed()
-            if sortby == "tsize":
-                self.sortByTotalSize()
             if sortby == "size":
                 self.sortBySize()
-            if sortby == "tdeps":
-                self.sortByTotalDeps()
-            if sortby == "lsize":
+            if sortby == "nbtotaldeps":
+                self.sortByNbTotalDeps()
+            if sortby == "nblinkeddeps":
+                self.sortByNbLinkedDeps()
+            if sortby == "linkeddepssize":
                 self.sortByLinkedDepsSize()
+            if sortby == "totalsize":
+                self.sortByTotalSize()
 
     def sortByName(self):
         self.mylist.sort(key=lambda p: p.pkgname, reverse=False)
@@ -837,14 +853,17 @@ class Packages:
     def sortByNbUsed(self):
         self.mylist.sort(key=lambda p: p.nbused, reverse=True)
 
-    def sortByTotalDeps(self):
+    def sortByNbTotalDeps(self):
         self.mylist.sort(key=lambda p: p.nbtotaldeps, reverse=True)
+
+    def sortByNbLinkedDeps(self):
+        self.mylist.sort(key=lambda p: p.nblinkeddeps, reverse=True)
 
     def sortBySize(self):
         self.mylist.sort(key=lambda p: p.size, reverse=True)
 
     def sortByLinkedDepsSize(self):
-        self.mylist.sort(key=lambda p: p.all_linkeddeps_totalsize, reverse=True)
+        self.mylist.sort(key=lambda p: p.all_linkeddeps_size, reverse=True)
 
     def sortByTotalSize(self):
         self.mylist.sort(key=lambda p: p.totalsize, reverse=True)
@@ -1163,7 +1182,7 @@ def main():
 
     if action == "tree":
         if findpkg:
-            showTreeDeps(findpkg)
+            showTreeDeps(findpkg[0])
         else:
             print ("Package not found")
 
