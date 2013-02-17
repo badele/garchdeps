@@ -692,7 +692,6 @@ class Packages:
     def calcTopReverse(self):
         for p in self.mylist:
             if p.nbused == 0:
-                print ("Calc deps for %s" % p)
                 for r in p.alldeps:
                     if p not in r.topreverse:
                         r.topreverse.append(p)
@@ -701,7 +700,6 @@ class Packages:
         for p in self.mylist:
             for a in p.alldeps:
                 if len(a.topreverse) == 1 and p in a.topreverse:
-                    print ("Ajout de %s à %s" % (a, p))
                     p.all_linkeddeps.append(a)
 
     def calcStats(self):
@@ -726,35 +724,31 @@ class Packages:
         for p in self.mylist:
             p.maxdepth = p.searchMaxDepth(0, 0)
 
-
-    def showItem(self, title, field):
-        """ Show Item field"""
-        if field in ('size', 'depssize', 'all_linkeddeps_totalsize'):
-            minvalue = convertSize(
-                getattr(self.__mini[field], field))
-            maxvalue = convertSize(
-                getattr(self.__maxi[field], field))
-        else:
-            minvalue = getattr(self.__mini[field], field)
-            maxvalue = getattr(self.__maxi[field], field)
-
-        print ("   %-20s (min/max) : %-30s     %s(%s)" %
+    def showItem(self, title, value):
+        print ("%25s : %s" %
                (title,
-                "%s(%s)" % (self.__mini[field].pkgname, minvalue),
-                self.__maxi[field].pkgname,
-                maxvalue
+                value
                 ))
 
     def showInfo(self):
         """Show summary infos"""
-        print ("Packages installed: %s" % len(self.mylist))
-        self.showItem("Size", 'size')
-        self.showItem("Total O. Size", 'all_linkeddeps_totalsize')
-        self.showItem('Used by', 'nbused')
-        self.showItem('Total deps', 'nbtotaldeps')
-        self.showItem('Max depths', 'maxdepth')
-        print ("All packages size: %s" % convertSize(self.fullsize))
+        self.showItem("Total packages installed", len(self.mylist))
+        self.showItem("All packages size", convertSize(self.fullsize))
+        self.showItem("Max size", "%s(%s)" % (self.__maxi['size'].pkgname, convertSize(self.__maxi['size'].size)))
+        self.showItem("Total Linked deps Size", "%s(%s)" % (self.__maxi['all_linkeddeps_totalsize'].pkgname, convertSize(self.__maxi['all_linkeddeps_totalsize'].all_linkeddeps_totalsize)))
+        self.showItem("Max Nb used by", "%s(%s)" % (self.__maxi['nbused'].pkgname, self.__maxi['nbused'].nbused))
+        self.showItem("Max total deps", "%s(%s)" % (self.__maxi['nbtotaldeps'].pkgname, self.__maxi['nbtotaldeps'].nbtotaldeps))
+        self.showItem("Max depths", "%s(%s)" % (self.__maxi['maxdepth'].pkgname, self.__maxi['maxdepth'].maxdepth))
 
+    def showOrphan(self):
+        for p in self.mylist:
+            orphans = "sudo pacman -R %s" % p.pkgname
+            for o in p.all_linkeddeps:
+                orphans += " %s" % o.pkgname
+            print ('%-40s %-7s %s ' %
+                   (p,
+                    convertSize(p.totalsize),
+                    orphans))
 
     def showColumn(self):
         """Show list packages in column"""
@@ -772,7 +766,7 @@ class Packages:
                 "N. depth",
                 "N usedby",
                 "P. Size",
-                "O. Size",
+                "L. Size",
                 "T. Size",
                 "D. Size",
                 "% T. Size"))
@@ -804,7 +798,7 @@ class Packages:
                 self.sortBySize()
             if sortby == "tdeps":
                 self.sortByTotalDeps()
-            if sortby == "linkdepdeps":
+            if sortby == "lsize":
                 self.sortByLinkedDepsSize()
 
     def sortByName(self):
@@ -822,7 +816,7 @@ class Packages:
     def sortBySize(self):
         self.mylist.sort(key=lambda p: p.size, reverse=True)
 
-    def sortBylinkedDepsSize(self):
+    def sortByLinkedDepsSize(self):
         self.mylist.sort(key=lambda p: p.all_linkeddeps_totalsize, reverse=True)
 
     def sortByTotalSize(self):
@@ -1036,13 +1030,15 @@ def generateGraph(findpkg, allpackages, filename):
 
 def searchPackage(packages, pkgnames):
     """Search package by pkgname"""
+    foundpackages = Packages()
     pkglist = pkgnames.split(",")
     for p in pkglist:
         f = packages.getPkgByName(p)
         if f:
-            return f
+            foundpackages.append(f)
 
-    return None
+
+    return foundpackages
 
 
 def showTreeDeps(p):
@@ -1060,6 +1056,7 @@ def usage():
     print ("  -g, --graph <filename>               write a graphviz file")
     print ("  -s, --sortby <nusedby, tsize, tdeps> sort list by")
     print ("  -u, --updatep                        force update load pkgfile")
+    print ("  -o, --orphan                         Show orphan package for pkg")
     print ("  -h, --help                           shows this help screen")
 
 
@@ -1067,9 +1064,9 @@ def main():
     try:
         opts, args = getopt.getopt(
             sys.argv[1:],
-            "hiug:tn:f:s:r",
+            "hiug:tn:f:s:ro",
             ["help", "info", "update", "graph=", "tree",
-             "nblines=", "find=", "sortby=", "reverse", "test"])
+             "nblines=", "find=", "sortby=", "reverse", "test", "orphan"])
     except getopt.GetoptError:
         usage()
         sys.exit(2)
@@ -1098,6 +1095,9 @@ def main():
 
         if opt in ("-u", "--update"):
             actionforceupdate = True
+
+        if opt in ("-o", "--orpahn"):
+            action = "orphan"
 
         if opt in ("-g", "--graph"):
             action = "graph"
@@ -1130,6 +1130,7 @@ def main():
         findpkg = searchPackage(allpackages, pkgnames)
         if not actionreverse:
             packages.append(findpkg)
+            packages = findpkg
         else:
             packages = findpkg.usedby
 
@@ -1142,6 +1143,15 @@ def main():
     if action == "graph":
         allpackages.sortBy("nusedby")
         generateGraph(packages, allpackages, filename)
+
+    if action == "orphan":
+        if findpkg:
+            for p in packages:
+                print ("%s: %s" % (p, p.all_linkeddeps))
+        else:
+            allpackages.sortBy(sortby)
+            allpackages[:n].showOrphan()
+
 
     if action == "info":
         allpackages.showInfo()
