@@ -734,11 +734,38 @@ class Packages:
         """Show summary infos"""
         self.showItem("Total packages installed", len(self.mylist))
         self.showItem("All packages size", convertSize(self.fullsize))
-        self.showItem("Max size", "%s(%s)" % (self.__maxi['size'].pkgname, convertSize(self.__maxi['size'].size)))
-        self.showItem("Total Linked deps Size", "%s(%s)" % (self.__maxi['all_linkeddeps_totalsize'].pkgname, convertSize(self.__maxi['all_linkeddeps_totalsize'].all_linkeddeps_totalsize)))
-        self.showItem("Max Nb used by", "%s(%s)" % (self.__maxi['nbused'].pkgname, self.__maxi['nbused'].nbused))
-        self.showItem("Max total deps", "%s(%s)" % (self.__maxi['nbtotaldeps'].pkgname, self.__maxi['nbtotaldeps'].nbtotaldeps))
-        self.showItem("Max depths", "%s(%s)" % (self.__maxi['maxdepth'].pkgname, self.__maxi['maxdepth'].maxdepth))
+        self.showItem("Max size",
+                      "%s(%s)"
+                      %
+                      (self.__maxi['size'].pkgname,
+                       convertSize(self.__maxi['size'].size))
+                      )
+        self.showItem("Total Linked deps Size",
+                      "%s(%s)"
+                      %
+                      (self.__maxi['all_linkeddeps_totalsize'].pkgname,
+                       convertSize(
+                    self.__maxi['all_linkeddeps_totalsize'].all_linkeddeps_totalsize)
+                       )
+                      )
+        self.showItem("Max Nb used by",
+                      "%s(%s)"
+                      %
+                      (self.__maxi['nbused'].pkgname,
+                       self.__maxi['nbused'].nbused)
+                      )
+        self.showItem("Max total deps",
+                      "%s(%s)"
+                      %
+                      (self.__maxi['nbtotaldeps'].pkgname,
+                       self.__maxi['nbtotaldeps'].nbtotaldeps)
+                      )
+        self.showItem("Max depths",
+                      "%s(%s)"
+                      %
+                      (self.__maxi['maxdepth'].pkgname,
+                       self.__maxi['maxdepth'].maxdepth)
+                      )
 
     def showOrphan(self):
         for p in self.mylist:
