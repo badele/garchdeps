@@ -879,15 +879,16 @@ class TestPackages(unittest.TestCase):
         filename = "%s/%s" % (pwd, "packages.cache")
         self.__allpackages = loadPkgInfo(filename, False, True)
 
-    def test_nbpackages(self):
+    def test_summary(self):
+        """ test summary properties"""
         self.assertEqual(len(self.__allpackages), 1277)
+        self.assertEqual(self.__allpackages.fullsize, 6347736)
 
     def test_size(self):
+        """ test object size"""
         self.assertEqual(self.__allpackages.getPkgByName('libreoffice-common').size, 241767)
         self.assertEqual(self.__allpackages.getPkgByName('kdebase-workspace').size, 73720)
-
-    def test_fullsize(self):
-        self.assertEqual(self.__allpackages.fullsize, 6347736.0)
+        self.assertEqual(self.__allpackages.getPkgByName('arduino').size, 47104)
 
     def test_maxiobject(self):
         self.assertEqual(self.__allpackages.maxi['size'].pkgname,
@@ -901,18 +902,6 @@ class TestPackages(unittest.TestCase):
         self.assertEqual(self.__allpackages.maxi['maxdepth'].pkgname,
                          'kdeutils-kremotecontrol')
 
-    # def test_minobject(self):
-    #     self.assertEqual(self.__allpackages.mini['size'].pkgname,
-    #                      'xclm-dirs')
-    #     self.assertEqual(self.__allpackages.mini['depssize'].pkgname,
-    #                      'yelp-xsl')
-    #     self.assertEqual(self.__allpackages.mini['nbused'].pkgname,
-    #                      'zsh')
-    #     self.assertEqual(self.__allpackages.mini['nbtotaldeps'].pkgname,
-    #                      'yelp-xsl')
-    #     self.assertEqual(self.__allpackages.mini['maxdepth'].pkgname,
-    #                      'yelp-xsl')
-
     def test_maxivalue(self):
         self.assertEqual(self.__allpackages.maxi['size'].size,
                          241767.0)
@@ -924,19 +913,6 @@ class TestPackages(unittest.TestCase):
                          292)
         self.assertEqual(self.__allpackages.maxi['maxdepth'].maxdepth,
                          16)
-
-    # def test_minivalue(self):
-    #     self.assertEqual(self.__allpackages.mini['size'].size,
-    #                      0)
-    #     self.assertEqual(self.__allpackages.mini['depssize'].depssize,
-    #                      0.0)
-    #     self.assertEqual(self.__allpackages.mini['nbused'].nbused,
-    #                      0)
-    #     self.assertEqual(self.__allpackages.mini['nbtotaldeps'].nbtotaldeps,
-    #                      0)
-    #     self.assertEqual(self.__allpackages.mini['maxdepth'].maxdepth,
-    #                      0)
-
 
 def cmp_pkgused(p1, p2):
     if p1.count == p2.count: return 0
