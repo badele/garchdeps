@@ -47,7 +47,7 @@ def convertSize(s):
 
 
 
-class Package:
+class Package(object):
     """ Object Package
     This object store the package informations
     """
@@ -89,7 +89,6 @@ class Package:
         """ Total linked dependencies for this packages"""
         return len(self.all_linkeddeps)
 
-
     @property
     def linkeddeps(self):
         """ All dependencies object used only by me"""
@@ -99,7 +98,6 @@ class Package:
     def all_linkeddeps(self):
         """ All dependencies object used only by me"""
         return self.__all_linkeddeps
-
 
     @property
     def raw_provides(self):
@@ -207,7 +205,7 @@ class Package:
         return self.__manualinstalled
 
     @manualinstalled.setter
-    def manualinstall(self, value):
+    def manualinstalled(self, value):
         self.__manualinstalled = value
 
     @property
@@ -496,7 +494,7 @@ label = "%s (%s - %s)";\n' %\
             self.__usedby.append(obj)
 
 
-class Packages:
+class Packages(object):
     """ Packages object"""
     #@property
     # def mini(self):
@@ -504,6 +502,10 @@ class Packages:
     @property
     def maxi(self):
         return self.__maxi
+
+    @maxi.setter
+    def maxi(self, value):
+        self.__maxi = value
 
     @property
     def counttotaldeps(self):
@@ -873,10 +875,16 @@ class Packages:
 class TestPackages(unittest.TestCase):
     def setUp(self):
         """Before unittest"""
-        self.__allpackages = loadPkgInfo("/tmp/packages", False, True)
+        pwd = os.path.dirname(__file__)
+        filename = "%s/%s" % (pwd, "packages.cache")
+        self.__allpackages = loadPkgInfo(filename, False, True)
 
     def test_nbpackages(self):
         self.assertEqual(len(self.__allpackages), 1277)
+
+    def test_size(self):
+        self.assertEqual(self.__allpackages.getPkgByName('libreoffice-common').size, 241767)
+        self.assertEqual(self.__allpackages.getPkgByName('kdebase-workspace').size, 73720)
 
     def test_fullsize(self):
         self.assertEqual(self.__allpackages.fullsize, 6347736.0)
@@ -984,8 +992,7 @@ def getPkgList(sfilter="", test=False):
         # Search manual installation
         m = re.match(r'^Install Reason +: +(.+)', line)
         if m:
-            current_pkg.manualinstalled = (
-                m.group(1) == "Explicitly installed")
+            current_pkg.manualinstalled = m.group(1) == "Explicitly installed"
 
         # Search provide package
         m = re.match(r'^Provides +: +(.+)', line)
@@ -1035,8 +1042,8 @@ def loadPkgInfo(filename, forceupdate, test=False):
         packages = pickle.load(open(filename, 'rb'))
     else:
         # Parse all installed packages
-        print ("Caching the package list, please wait ...")
-        packages = getPkgList("",test)
+        print ("Caching the package list to %s, please wait ..." % filename)
+        packages = getPkgList("", test)
         packages.analyzeDependencies()
         packages.calcAllDeps()
         packages.calcTopReverse()
@@ -1188,9 +1195,12 @@ def main():
             usage()
             sys.exit()
 
-    allpackages = loadPkgInfo("/tmp/packages", actionforceupdate)
+
     findpkg = None
     packages = Packages()
+
+    if action != "test":
+        allpackages = loadPkgInfo("/tmp/packages.cache", actionforceupdate)
 
     if actionfind:
         findpkg = searchPackage(allpackages, pkgnames)
