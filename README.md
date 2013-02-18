@@ -1,4 +1,6 @@
 # garchdeps
+[![Build Status](https://secure.travis-ci.org/badele/garchdeps.png)](http://travis-ci.org/badele/garchdeps)
+
 =========
 
 Tool that show graphical dependencies of the archlinux packages
