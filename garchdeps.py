@@ -781,16 +781,19 @@ class Packages(object):
                        self.__maxi['maxdepth'].maxdepth)
                       )
 
-    def showUninstall(self):
+    def showUninstall(self, useyaourt=False):
         for p in self.mylist:
-            uninstall = "sudo pacman -R %s" % p.pkgname
+            if useyaourt:
+                uninstall = "yaourt -R %s" % p.pkgname
+            else:
+                uninstall = "sudo pacman -R %s" % p.pkgname
+
             for o in p.all_linkeddeps:
                 uninstall += " %s" % o.pkgname
             print ('%-40s %-7s %s ' %
                    (p,
                     convertSize(p.totalsize),
                     uninstall))
-
 
     def showColumn(self):
         """Show list packages in column"""
@@ -844,6 +847,8 @@ class Packages(object):
                 self.sortByNbLinkedDeps()
             if sortby == "linkeddepssize":
                 self.sortByLinkedDepsSize()
+            if sortby == "depssize":
+                self.sortByDepsSize()
             if sortby == "totalsize":
                 self.sortByTotalSize()
 
@@ -867,6 +872,9 @@ class Packages(object):
 
     def sortByLinkedDepsSize(self):
         self.mylist.sort(key=lambda p: p.all_linkeddeps_size, reverse=True)
+
+    def sortByDepsSize(self):
+        self.mylist.sort(key=lambda p: p.depssize, reverse=True)
 
     def sortByTotalSize(self):
         self.mylist.sort(key=lambda p: p.totalsize, reverse=True)
@@ -1115,9 +1123,11 @@ def main():
     try:
         opts, args = getopt.getopt(
             sys.argv[1:],
-            "hig:tn:f:s:rou",
-            ["help", "info", "force", "graph=", "tree",
-             "nblines=", "find=", "sortby=", "reverse", "test", "uninstall"])
+            "hig:tn:f:s:rouy",
+            [
+                "help", "info", "force", "graph=", "tree",
+                "nblines=", "find=", "sortby=", "reverse", "test", "uninstall",
+                "yaourt"])
     except getopt.GetoptError:
         usage()
         sys.exit(2)
@@ -1126,6 +1136,7 @@ def main():
     actionfind = False
     actionreverse = False
     actionforceupdate = False
+    useyaourt = False
     action = ""
     pkgnames = ""
     filename = ""
@@ -1168,6 +1179,10 @@ def main():
         if opt in ("-r", "--reverse"):
             actionreverse = True
 
+        if opt in ("-y", "--yaourt"):
+            useyaourt = True
+
+
         if opt in ("-h", "--help"):
             usage()
             sys.exit()
@@ -1208,11 +1223,10 @@ def main():
     if action == "uninstall":
         if findpkg:
             findpkg.sortBy(sortby)
-            findpkg.showUninstall()
+            findpkg.showUninstall(useyaourt)
         else:
             allpackages.sortBy(sortby)
-            allpackages[:n].showUninstall()
-
+            allpackages[:n].showUninstall(useyaourt)
 
     if action == "info":
         allpackages.showInfo()
