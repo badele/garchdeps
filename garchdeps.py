@@ -1090,7 +1090,8 @@ def usage():
     print ("  -s, --sortby <name, nbused, size, \n\
                 nbtotaldeps, nblinkeddeps,\n\
                 linkeddepssize, totalsize>  sort list by")
-    print ("  -u, --updatep                             force update load pkgfile")
+    print ("  --force                                   force update load pkgfile")
+    print ("  -u, --uninstall                           list packages when uninstall")
     print ("  -o, --orphan                              Show orphan package for pkg")
     print ("  -h, --help                                shows this help screen")
 
@@ -1114,9 +1115,9 @@ def main():
     try:
         opts, args = getopt.getopt(
             sys.argv[1:],
-            "hiug:tn:f:s:ro",
-            ["help", "info", "update", "graph=", "tree",
-             "nblines=", "find=", "sortby=", "reverse", "test", "orphan"])
+            "hig:tn:f:s:rou",
+            ["help", "info", "force", "graph=", "tree",
+             "nblines=", "find=", "sortby=", "reverse", "test", "uninstall"])
     except getopt.GetoptError:
         usage()
         sys.exit(2)
@@ -1125,7 +1126,6 @@ def main():
     actionfind = False
     actionreverse = False
     actionforceupdate = False
-    findpkg = None
     action = ""
     pkgnames = ""
     filename = ""
@@ -1143,11 +1143,11 @@ def main():
             actionfind = True
             pkgnames = arg
 
-        if opt in ("-u", "--update"):
+        if opt in ("", "--force"):
             actionforceupdate = True
 
-        if opt in ("-o", "--orpahn"):
-            action = "orphan"
+        if opt in ("-u", "--uninstall"):
+            action = "uninstall"
 
         if opt in ("-g", "--graph"):
             action = "graph"
@@ -1172,38 +1172,46 @@ def main():
             usage()
             sys.exit()
 
-
     findpkg = None
-    packages = Packages()
 
     if action != "test":
         allpackages = loadPkgInfo("/tmp/packages.cache", actionforceupdate)
 
     if actionfind:
         findpkg = searchPackage(allpackages, pkgnames)
-        if not actionreverse:
-            packages.append(findpkg)
-            packages = findpkg
-        else:
-            packages = findpkg.usedby
+        if len(findpkg) >= 1:
+            if len(findpkg) == 1:
+                if actionreverse:
+                    packages = findpkg[0].topreverse
+                    for p in findpkg[0].usedby:
+                        packages.append(p)
+
+                    findpkg = packages
+
+        if findpkg is None or len(findpkg) == 0:
+            print ("Package not found")
+            sys.exit()
 
     if action == "tree":
-        if findpkg:
-            showTreeDeps(findpkg[0])
+        if actionfind:
+            if findpkg:
+                showTreeDeps(findpkg[0])
+            else:
+                print ("Package not found")
         else:
-            print ("Package not found")
+            print ("Please use -f, --find option with -t, --tree option")
 
     if action == "graph":
         allpackages.sortBy("nusedby")
-        generateGraph(packages, allpackages, filename)
+        generateGraph(findpkg, allpackages, filename)
 
-    if action == "orphan":
+    if action == "uninstall":
         if findpkg:
-            for p in packages:
-                print ("%s: %s" % (p, p.all_linkeddeps))
+            findpkg.sortBy(sortby)
+            findpkg.showUninstall()
         else:
             allpackages.sortBy(sortby)
-            allpackages[:n].showOrphan()
+            allpackages[:n].showUninstall()
 
 
     if action == "info":
@@ -1211,8 +1219,8 @@ def main():
 
     if action == "":
         if findpkg:
-            pkgs = findpkg[0].usedby
-            pkgs.showColumn()
+            findpkg.sortBy(sortby)
+            findpkg.showColumn()
         else:
             allpackages.sortBy(sortby)
             allpackages[:n].showColumn()
