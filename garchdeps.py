@@ -781,15 +781,16 @@ class Packages(object):
                        self.__maxi['maxdepth'].maxdepth)
                       )
 
-    def showOrphan(self):
+    def showUninstall(self):
         for p in self.mylist:
-            orphans = "sudo pacman -R %s" % p.pkgname
+            uninstall = "sudo pacman -R %s" % p.pkgname
             for o in p.all_linkeddeps:
-                orphans += " %s" % o.pkgname
+                uninstall += " %s" % o.pkgname
             print ('%-40s %-7s %s ' %
                    (p,
                     convertSize(p.totalsize),
-                    orphans))
+                    uninstall))
+
 
     def showColumn(self):
         """Show list packages in column"""
