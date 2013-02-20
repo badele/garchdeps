@@ -790,9 +790,10 @@ class Packages(object):
 
             for o in p.all_linkeddeps:
                 uninstall += " %s" % o.pkgname
-            print ('%-40s %-7s %s ' %
+            print ('%-40s %-10s [%3s] %s ' %
                    (p,
                     convertSize(p.totalsize),
+                    p.nbused,
                     uninstall))
 
     def showColumn(self):
