@@ -1092,17 +1092,21 @@ def showTreeDeps(p):
 def usage():
     print ("Usage: %s [OPTIONS]" % (sys.argv[0]))
     print ("A package dependencies graph tools")
+    print ("== Main functions ==")
     print ("  -f, --find <pkgname>                      find package")
     print ("  -t, --tree                                show tree dependencies")
+    print ("  -g, --graph <out filename>                write a graphviz file")
+    print ("  -o, --orphan                              Show orphan package for pkg")
+
+    print ("")
+    print ("== Common options ==")
     print ("  -n, --num <Num>                           number lines displayed")
-    print ("  -g, --graph <filename>                    write a graphviz file")
-    print ("  -r, --reverse <filename>                  reverse dependencies")
+    print ("  -r, --reverse                             reverse dependencies")
     print ("  -s, --sortby <name, nbused, size, \n\
                 nbtotaldeps, nblinkeddeps,\n\
                 linkeddepssize, totalsize>  sort list by")
     print ("  --force                                   force update load pkgfile")
     print ("  -u, --uninstall                           list packages when uninstall")
-    print ("  -o, --orphan                              Show orphan package for pkg")
     print ("  -h, --help                                shows this help screen")
 
             # if sortby == "name":
