@@ -46,7 +46,6 @@ def convertSize(s):
     return r
 
 
-
 class Package(object):
     """ Object Package
     This object store the package informations
@@ -242,7 +241,6 @@ class Package(object):
 
     def __repr__(self):
         return self.pkgname
-
 
     def calcGraphviz(self,
                      package,
@@ -1051,9 +1049,11 @@ def loadPkgInfo(filename, forceupdate, test=False):
 def generateGraph(findpkg, allpackages, filename):
     """ Generate a dot graphviz"""
     subgraph = []
+    subgraph.append(allpackages.getPkgByName('libgnomeui'))
     subgraph.append(allpackages.getPkgByName('kdebase-runtime'))
     subgraph.append(allpackages.getPkgByName('kdebase-workspace'))
     subgraph.append(allpackages.getPkgByName('qt'))
+    subgraph.append(allpackages.getPkgByName('qt3'))
     subgraph.append(allpackages.getPkgByName('gtk3'))
     subgraph.append(allpackages.getPkgByName('wxgtk'))
 
@@ -1096,6 +1096,7 @@ def usage():
     print ("  -t, --tree                                show tree dependencies")
     print ("  -n, --num <Num>                           number lines displayed")
     print ("  -g, --graph <filename>                    write a graphviz file")
+    print ("  -r, --reverse <filename>                  reverse dependencies")
     print ("  -s, --sortby <name, nbused, size, \n\
                 nbtotaldeps, nblinkeddeps,\n\
                 linkeddepssize, totalsize>  sort list by")
@@ -1133,7 +1134,7 @@ def main():
         usage()
         sys.exit(2)
 
-    n = 20  # number line showed
+    n = 50  # number line showed
     actionfind = False
     actionreverse = False
     actionforceupdate = False
