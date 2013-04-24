@@ -13,7 +13,6 @@ import sys
 import pickle
 import getopt
 import unittest
-import pprint
 
 # Parameters
 debug = 0
@@ -285,7 +284,6 @@ label = "%s (%s - %s)";\n' %\
         if level == 0:
             fillcolor = ', fillcolor="red2", color="red2"'
 
-
         if not exists:
             nbused = p.nbused
 
@@ -345,10 +343,24 @@ label = "%s (%s - %s)";\n' %\
                         opts += ', fillcolor="chartreuse3", color="chartreuse3"'
 
                 if o.virtual:
-                    s += '"%s" [label="%s(by %s)\\n%s + %s\\n%s" %s];\n' %\
-                        (d.pkgname, o.pkgname, d.pkgname, convertSize(d.size),convertSize(d.all_linkeddeps_size), convertSize(d.depssize), opts)
+                    s += '"%s" [label="%s(by %s)\\n%s + %s\\n%s" %s];\n' % (
+                        d.pkgname,
+                        o.pkgname,
+                        d.pkgname,
+                        convertSize(d.size),
+                        convertSize(d.all_linkeddeps_size),
+                        convertSize(d.depssize),
+                        opts
+                    )
                 else:
-                    s += '"%s" [label="%s\\n%s + %s\\n%s" %s];\n' % (o.pkgname, o.pkgname, convertSize(d.size),convertSize(d.all_linkeddeps_size), convertSize(d.depssize), opts)
+                    s += '"%s" [label="%s\\n%s + %s\\n%s" %s];\n' % (
+                        o.pkgname,
+                        o.pkgname,
+                        convertSize(d.size),
+                        convertSize(d.all_linkeddeps_size),
+                        convertSize(d.depssize),
+                        opts
+                    )
 
             s += '"%s" -> "%s";\n' % (p.pkgname, d.pkgname)
 
@@ -452,13 +464,12 @@ label = "%s (%s - %s)";\n' %\
         if current == 0:
             self.__alldeps = uniq
 
-
-    def calcLinkedDeps(self,counttotaldeps):
+    def calcLinkedDeps(self, counttotaldeps):
         # Search unique dependencie for a package
         # self.counttotaldeps
-        print ("-- Calcul pour %s" % self.pkgname)
+        print("-- Calcul pour %s" % self.pkgname)
         for p in self.__alldeps:
-            print ("CHECK pour %s" % p)
+            print("CHECK pour %s" % p)
             if p in counttotaldeps and counttotaldeps[p] == 1 and p.nbused <= 1:
                 p.isuniquedep = True
                 self.linkeddeps.append(p)
@@ -471,15 +482,6 @@ label = "%s (%s - %s)";\n' %\
                 totalsize += d.size
 
         self.__depssize = totalsize
-
-    # def calcAllOnlyByMeTotalSize(self):
-    #     """Calc a total size for a package"""
-    #     totalsize = 0
-    #     for d in self.__all_only_byme:
-    #         totalsize += d.size
-
-    #     self.all_only_byme_totalsize = totalsize
-
 
     def addDeps(self, obj):
         """Add package object in deps object"""
@@ -610,7 +612,6 @@ class Packages(object):
                                 0,
                                 idxcolor,
                                 duplicate)
-            
         return r
 
     def filterManualInstall(self, search=True):
@@ -671,13 +672,12 @@ class Packages(object):
                     r.usedby.append(p)
 
                     tp = r.realpkg
-                    # print ("PKG:%s(%s) REAL:%s(%s)" % (r,r.size, tp, tp.size))
                     if tp not in self.counttotaldeps:
                         self.counttotaldeps[tp] = 1
                     else:
                         self.counttotaldeps[tp] += 1
                 else:
-                    print ("Paquet de dependance non trouve %s" % d)
+                    print("Paquet de dependance non trouve %s" % d)
 
         # Calc depth
         self.searchMaxDepth()
@@ -715,7 +715,6 @@ class Packages(object):
             p.calcDepsSize()
             p.all_linkeddeps.calcFullSize()
 
-
             # Calc mini/maxi
             self.__compareField('size', p)
             self.__compareField('depssize', p)
@@ -731,10 +730,11 @@ class Packages(object):
             p.maxdepth = p.searchMaxDepth(0, 0)
 
     def showItem(self, title, value):
-        print ("%25s : %s" %
-               (title,
-                value
-                ))
+        print("%25s : %s" % (
+            title,
+            value
+        )
+        )
 
     def showInfo(self):
         """Show summary infos"""
@@ -751,7 +751,7 @@ class Packages(object):
                       %
                       (self.__maxi['all_linkeddeps_size'].pkgname,
                        convertSize(
-                    self.__maxi['all_linkeddeps_size'].all_linkeddeps_size)
+                           self.__maxi['all_linkeddeps_size'].all_linkeddeps_size)
                        )
                       )
         self.showItem("Max Nb used by",
@@ -788,95 +788,109 @@ class Packages(object):
 
             for o in p.all_linkeddeps:
                 uninstall += " %s" % o.pkgname
-            print ('%-40s %-10s [%3s] %s ' %
-                   (p,
-                    convertSize(p.totalsize),
-                    p.nbused,
-                    uninstall))
+            print('%-40s %-10s [%3s] %s ' % (
+                p,
+                convertSize(p.totalsize),
+                p.nbused,
+                uninstall
+            )
+            )
 
     def showColumn(self):
         """Show list packages in column"""
-        maxtsize = 0
+        maxtsize = 0.01  # 0.01 for 0 division error
         for p in self.mylist:
             maxtsize = max(maxtsize, p.totalsize)
 
         separator = '-----------------------------------------+---------+---------+\
 ----------+----------+----------+----------+----------+----------+------------+'
-        print (separator)
+        print(separator)
 
-        print ('%-40s | %-7s | %-7s | %-8s | %-8s | %8s | %8s | %8s | %8s | %10s |' %
-               ("Package",
-                "T. Deps",
-                "L. Deps",
-                "N. depth",
-                "N usedby",
-                "P. Size",
-                "L. Size",
-                "T. Size",
-                "D. Size",
-                "% T. Size"))
+        print('%-40s | %-7s | %-7s | %-8s | %-8s | %8s | %8s | %8s | %8s | %10s |' %
+              ("Package",
+               "T. Deps",
+               "L. Deps",
+               "N. depth",
+               "N usedby",
+               "P. Size",
+               "L. Size",
+               "T. Size",
+               "D. Size",
+               "% T. Size"))
 
-        print (separator)
+        print(separator)
 
         for p in self.mylist:
-            print ('%-40s | %7d | %7d | %8d | %8d | %8s | %8s | %8s | %8s | %-10s |' %
-                   (p.pkgname,
-                    p.nbtotaldeps,
-                    p.nblinkeddeps,
-                    p.maxdepth,
-                    p.nbused,
-                    convertSize(p.size),
-                    convertSize(p.all_linkeddeps_size),
-                    convertSize(p.totalsize),
-                    convertSize(p.depssize),
-                    "#" * int((p.totalsize / float(maxtsize)) * 10)))
+            print('%-40s | %7d | %7d | %8d | %8d | %8s | %8s | %8s | %8s | %-10s |' %
+                  (p.pkgname,
+                   p.nbtotaldeps,
+                   p.nblinkeddeps,
+                   p.maxdepth,
+                   p.nbused,
+                   convertSize(p.size),
+                   convertSize(p.all_linkeddeps_size),
+                   convertSize(p.totalsize),
+                   convertSize(p.depssize),
+                   "#" * int((p.totalsize / float(maxtsize)) * 10)))
 
-    def sortBy(self, sortby):
+    def sortBy(self, sortby, orderby="desc"):
         """Sort by package property"""
         if sortby != "":
             if sortby == "name":
-                self.sortByName()
+                self.sortByName(orderby)
             if sortby == "nbused":
-                self.sortByNbUsed()
+                self.sortByNbUsed(orderby)
             if sortby == "size":
-                self.sortBySize()
+                self.sortBySize(orderby)
             if sortby == "nbtotaldeps":
-                self.sortByNbTotalDeps()
+                self.sortByNbTotalDeps(orderby)
             if sortby == "nblinkeddeps":
-                self.sortByNbLinkedDeps()
+                self.sortByNbLinkedDeps(orderby)
             if sortby == "linkeddepssize":
-                self.sortByLinkedDepsSize()
+                self.sortByLinkedDepsSize(orderby)
             if sortby == "depssize":
-                self.sortByDepsSize()
+                self.sortByDepsSize(orderby)
             if sortby == "totalsize":
-                self.sortByTotalSize()
+                self.sortByTotalSize(orderby)
 
-    def sortByName(self):
-        self.mylist.sort(key=lambda p: p.pkgname, reverse=False)
+    def sortByName(self, orderby):
+        self.mylist.sort(key=lambda p: p.pkgname, reverse=orderby == "desc")
 
-    def sortByMaxDepth(self):
-        self.mylist.sort(key=lambda p: p.maxdepth, reverse=True)
+    def sortByMaxDepth(self, orderby):
+        self.mylist.sort(key=lambda p: p.maxdepth, reverse=orderby == "desc")
 
-    def sortByNbUsed(self):
-        self.mylist.sort(key=lambda p: p.nbused, reverse=True)
+    def sortByNbUsed(self, orderby):
+        self.mylist.sort(key=lambda p: p.nbused, reverse=orderby == "desc")
 
-    def sortByNbTotalDeps(self):
-        self.mylist.sort(key=lambda p: p.nbtotaldeps, reverse=True)
+    def sortByNbTotalDeps(self, orderby):
+        self.mylist.sort(key=lambda p: p.nbtotaldeps,
+                         reverse=orderby == "desc"
+                         )
 
-    def sortByNbLinkedDeps(self):
-        self.mylist.sort(key=lambda p: p.nblinkeddeps, reverse=True)
+    def sortByNbLinkedDeps(self, orderby):
+        self.mylist.sort(key=lambda p: p.nblinkeddeps,
+                         reverse=orderby == "desc"
+                         )
 
-    def sortBySize(self):
-        self.mylist.sort(key=lambda p: p.size, reverse=True)
+    def sortBySize(self, orderby):
+        self.mylist.sort(key=lambda p: p.size,
+                         reverse=orderby == "desc"
+                         )
 
-    def sortByLinkedDepsSize(self):
-        self.mylist.sort(key=lambda p: p.all_linkeddeps_size, reverse=True)
+    def sortByLinkedDepsSize(self, orderby):
+        self.mylist.sort(key=lambda p: p.all_linkeddeps_size,
+                         reverse=orderby == "desc"
+                         )
 
-    def sortByDepsSize(self):
-        self.mylist.sort(key=lambda p: p.depssize, reverse=True)
+    def sortByDepsSize(self, orderby):
+        self.mylist.sort(key=lambda p: p.depssize,
+                         reverse=orderby == "desc"
+                         )
 
-    def sortByTotalSize(self):
-        self.mylist.sort(key=lambda p: p.totalsize, reverse=True)
+    def sortByTotalSize(self, orderby):
+        self.mylist.sort(key=lambda p: p.totalsize,
+                         reverse=orderby == "desc"
+                         )
 
 
 # Test here due error pickle if i use test in test.py file
@@ -921,6 +935,7 @@ class TestPackages(unittest.TestCase):
                          292)
         self.assertEqual(self.__allpackages.maxi['maxdepth'].maxdepth,
                          16)
+
 
 def cmp_pkgused(p1, p2):
     if p1.count == p2.count: return 0
@@ -1026,7 +1041,7 @@ def loadPkgInfo(filename, forceupdate, test=False):
         packages = pickle.load(open(filename, 'rb'))
     else:
         # Parse all installed packages
-        print ("Caching the package list to %s, please wait ..." % filename)
+        print("Caching the package list to %s, please wait ..." % filename)
         packages = getPkgList("", test)
         packages.analyzeDependencies()
         packages.calcAllDeps()
@@ -1059,7 +1074,7 @@ def generateGraph(findpkg, allpackages, filename):
 
     if not findpkg:
         findpkg = allpackages.filterManualInstall()[:100]
-        findpkg.sortBy('tsize')
+        findpkg.sortBy('totalsize')
 
     r = allpackages.beforeGraph()
     r += allpackages.calcGraphviz(findpkg, subgraph, 99)
@@ -1079,7 +1094,6 @@ def searchPackage(packages, pkgnames):
         if f:
             foundpackages.append(f)
 
-
     return foundpackages
 
 
@@ -1090,50 +1104,35 @@ def showTreeDeps(p):
 
 
 def usage():
-    print ("Usage: %s [OPTIONS]" % (sys.argv[0]))
-    print ("A package dependencies graph tools")
-    print ("== Main functions ==")
-    print ("  -f, --find <pkgname>                      find package")
-    print ("  -t, --tree                                show tree dependencies")
-    print ("  -g, --graph <out filename>                write a graphviz file")
-    print ("  -o, --orphan                              Show orphan package for pkg")
+    print("Usage: %s [OPTIONS]" % (sys.argv[0]))
+    print("A package dependencies graph tools")
+    print("== Main functions ==")
+    print("  -f, --find <pkgname>                      find package")
+    print("  -t, --tree                                show tree dependencies")
+    print("  -g, --graph <out filename>                write a graphviz file")
 
-    print ("")
-    print ("== Common options ==")
-    print ("  -n, --num <Num>                           number lines displayed")
-    print ("  -r, --reverse                             reverse dependencies")
-    print ("  -s, --sortby <name, nbused, size, \n\
+    print("")
+    print("== Common options ==")
+    print("  -n, --num <Num>                          number lines displayed")
+    print("  -r, --reverse                            reverse dependencies")
+    print("  -s, --sortby <name, nbused, size, \n\
                 nbtotaldeps, nblinkeddeps,\n\
                 linkeddepssize, totalsize>  sort list by")
-    print ("  --force                                   force update load pkgfile")
-    print ("  -u, --uninstall                           list packages when uninstall")
-    print ("  -h, --help                                shows this help screen")
-
-            # if sortby == "name":
-            #     self.sortByName()
-            # if sortby == "nbused":
-            #     self.sortByNbUsed()
-            # if sortby == "size":
-            #     self.sortBySize()
-            # if sortby == "nbtotaldeps":
-            #     self.sortByNbTotalDeps()
-            # if sortby == "nblinkeddeps":
-            #     self.sortByNbLinkedDeps()
-            # if sortby == "linkeddepssize":
-            #     self.sortByLinkedDepsSize()
-            # if sortby == "totalsize":
-            #     self.sortByTotalSize()
+    print("  -a, --asc                                order list by ascending")
+    print("  --force                                  force update load pkgfile")
+    print("  -u, --uninstall                          list packages when uninstall")
+    print("  -h, --help                               shows this help screen")
 
 
 def main():
     try:
         opts, args = getopt.getopt(
             sys.argv[1:],
-            "hig:tn:f:s:rouy",
+            "hig:tn:f:s:ruya",
             [
                 "help", "info", "force", "graph=", "tree",
                 "nblines=", "find=", "sortby=", "reverse", "test", "uninstall",
-                "yaourt"])
+                "yaourt", "asc"])
     except getopt.GetoptError:
         usage()
         sys.exit(2)
@@ -1146,7 +1145,8 @@ def main():
     action = ""
     pkgnames = ""
     filename = ""
-    sortby = "size"
+    sortby = "totalsize"
+    orderby = "desc"
 
     for opt, arg in opts:
         if opt in ("-n", "--nblines"):
@@ -1176,6 +1176,9 @@ def main():
         if opt in ("-s", "--sortby"):
             sortby = arg
 
+        if opt in ("-a", "--asc"):
+            orderby = "asc"
+
         if opt in ("-i", "--info"):
             action = "info"
 
@@ -1187,7 +1190,6 @@ def main():
 
         if opt in ("-y", "--yaourt"):
             useyaourt = True
-
 
         if opt in ("-h", "--help"):
             usage()
@@ -1210,7 +1212,7 @@ def main():
                     findpkg = packages
 
         if findpkg is None or len(findpkg) == 0:
-            print ("Package not found")
+            print("Package not found")
             sys.exit()
 
     if action == "tree":
@@ -1218,20 +1220,20 @@ def main():
             if findpkg:
                 showTreeDeps(findpkg[0])
             else:
-                print ("Package not found")
+                print("Package not found")
         else:
-            print ("Please use -f, --find option with -t, --tree option")
+            print("Please use -f, --find option with -t, --tree option")
 
     if action == "graph":
-        allpackages.sortBy("nusedby")
+        allpackages.sortBy("nusedby", orderby)
         generateGraph(findpkg, allpackages, filename)
 
     if action == "uninstall":
         if findpkg:
-            findpkg.sortBy(sortby)
+            findpkg.sortBy(sortby, orderby)
             findpkg.showUninstall(useyaourt)
         else:
-            allpackages.sortBy(sortby)
+            allpackages.sortBy(sortby, orderby)
             allpackages[:n].showUninstall(useyaourt)
 
     if action == "info":
@@ -1239,10 +1241,10 @@ def main():
 
     if action == "":
         if findpkg:
-            findpkg.sortBy(sortby)
+            findpkg.sortBy(sortby, orderby)
             findpkg.showColumn()
         else:
-            allpackages.sortBy(sortby)
+            allpackages.sortBy(sortby, orderby)
             allpackages[:n].showColumn()
 
     if action == "test":
